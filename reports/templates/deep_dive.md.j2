@@ -1,0 +1,67 @@
+{% include "partials/header.md.j2" %}
+
+{% for ticker in ctx.tickers %}
+{% set profile = ctx.fundamentals_data.get(ticker, {}).get("profile", {}) %}
+{% set ratios = ctx.fundamentals_data.get(ticker, {}).get("ratios", {}) %}
+{% set tech = ctx.get_analysis(ticker, "technical") %}
+{% set risk = ctx.get_analysis(ticker, "risk") %}
+{% set val = ctx.get_analysis(ticker, "valuation") %}
+{% set moat = ctx.get_analysis(ticker, "moat") %}
+{% set sent = ctx.get_analysis(ticker, "sentiment") %}
+{% set score = ctx.scores.get(ticker, {}) %}
+
+## {{ profile.get("name", ticker) }} ({{ ticker }})
+
+| | |
+|---|---|
+| **Sector** | {{ profile.get("sector", "N/A") }} |
+| **Industry** | {{ profile.get("industry", "N/A") }} |
+| **Country** | {{ profile.get("country", "N/A") }} |
+| **Market Cap** | {{ profile.get("market_cap") | fmt_num }} |
+{% if score %}| **Composite Score** | **{{ score.composite_score }}/100** |
+| **Recommendation** | **{{ score.recommendation }}** |{% endif %}
+
+{% if profile.get("description") %}
+> {{ profile.description[:500] }}
+{% endif %}
+
+{% if score and score.component_scores %}
+### Score Breakdown
+
+| Component | Score | Weight |
+|-----------|-------|--------|
+{% for comp, s in score.component_scores.items() %}| {{ comp | replace("_"," ") | title }} | {{ s }}/100 | {{ "%.0f" | format((score.weights.get(comp, 0.1) * 100)) }}% |
+{% endfor %}
+{% endif %}
+
+{% if ratios %}
+{% include "partials/ratios_table.md.j2" %}
+{% endif %}
+
+{% if tech and tech.get("signals") %}
+{% include "partials/technical_signals.md.j2" %}
+{% endif %}
+
+{% if risk and risk.get("risk_level") %}
+{% include "partials/risk_profile.md.j2" %}
+{% endif %}
+
+{% if val and val.get("intrinsic_per_share") %}
+{% include "partials/valuation_dcf.md.j2" %}
+{% endif %}
+
+{% if moat and moat.get("moat_classification") %}
+{% include "partials/moat_spider.md.j2" %}
+{% endif %}
+
+{% if sent and sent.get("overall_label") %}
+{% include "partials/sentiment_summary.md.j2" %}
+{% endif %}
+
+{% endfor %}
+
+{% if ctx.tickers | length > 1 %}
+{% include "partials/peer_comparison.md.j2" %}
+{% endif %}
+
+{% include "partials/disclaimer.md.j2" %}

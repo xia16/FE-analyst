@@ -1,0 +1,16 @@
+## Valuation (DCF)
+
+{% if val.error is defined %}
+*DCF not available: {{ val.error }}*
+{% else %}
+| Parameter | Value |
+|-----------|-------|
+| Current FCF | {{ val.current_fcf | fmt_num }} |
+| Growth Rate | {{ "%.1f" | format(val.growth_rate * 100) }}% |
+| Terminal Growth | {{ "%.1f" | format(val.terminal_growth * 100) }}% |
+| Discount Rate | {{ "%.1f" | format(val.discount_rate * 100) }}% |
+| **Intrinsic Value/Share** | **${{ "%.2f" | format(val.intrinsic_per_share) }}** |
+| Current Price | ${{ "%.2f" | format(val.current_price) }} |
+| Margin of Safety | {{ "%.1f" | format(val.margin_of_safety_pct) }}% |
+| **Verdict** | **{{ val.verdict }}** |
+{% endif %}

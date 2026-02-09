@@ -1,0 +1,33 @@
+{% include "partials/header.md.j2" %}
+
+{% for ticker in ctx.tickers %}
+{% set profile = ctx.fundamentals_data.get(ticker, {}).get("profile", {}) %}
+{% set ratios = ctx.fundamentals_data.get(ticker, {}).get("ratios", {}) %}
+{% set score = ctx.scores.get(ticker, {}) %}
+{% set tech = ctx.get_analysis(ticker, "technical") %}
+{% set moat = ctx.get_analysis(ticker, "moat") %}
+
+## {{ profile.get("name", ticker) }} ({{ ticker }})
+
+| Metric | Value |
+|--------|-------|
+| **Sector** | {{ profile.get("sector", "N/A") }} |
+| **Market Cap** | {{ profile.get("market_cap") | fmt_num }} |
+{% if ratios.pe_forward is not none %}| **P/E (Forward)** | {{ ratios.pe_forward | fmt_ratio }} |{% endif %}
+{% if ratios.profit_margin is not none %}| **Profit Margin** | {{ ratios.profit_margin | fmt_pct }} |{% endif %}
+{% if ratios.revenue_growth is not none %}| **Revenue Growth** | {{ ratios.revenue_growth | fmt_pct }} |{% endif %}
+{% if ratios.roe is not none %}| **ROE** | {{ ratios.roe | fmt_pct }} |{% endif %}
+{% if score %}| **Score** | **{{ score.composite_score }}/100** |
+| **Recommendation** | **{{ score.recommendation }}** |{% endif %}
+
+{% if tech and tech.get("signals") %}
+**Signals:** {% for name, sig in tech.signals.items() %}{{ name | upper }}={{ sig.signal }} {% endfor %}
+{% endif %}
+
+{% if moat and moat.get("moat_classification") %}
+**Moat:** {{ moat.moat_classification }} ({{ moat.composite_moat_score }}/100)
+{% endif %}
+
+{% endfor %}
+
+{% include "partials/disclaimer.md.j2" %}

@@ -153,3 +153,21 @@ class MoatAnalyzer:
 
         df = pd.DataFrame(rows).sort_values("moat_score", ascending=False)
         return df
+
+
+# --- Plugin adapter for pipeline ---
+from src.analysis.base import BaseAnalyzer as _BaseAnalyzer
+
+
+class MoatAnalyzerPlugin(_BaseAnalyzer):
+    name = "moat"
+    default_weight = 0.10
+
+    def __init__(self):
+        self._analyzer = MoatAnalyzer()
+
+    def analyze(self, ticker, ctx):
+        overrides = ctx.company_meta.get(ticker, {})
+        result = self._analyzer.score_moat(ticker, moat_overrides=overrides)
+        result["score"] = result["composite_moat_score"]
+        return result

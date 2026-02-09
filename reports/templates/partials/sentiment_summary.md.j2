@@ -1,0 +1,15 @@
+## Sentiment
+
+**Overall: {{ sent.overall_label }}** (Score: {{ sent.overall_score }})
+
+{% if sent.sources %}
+{% for source, data in sent.sources.items() %}
+### {{ source | title }}
+{% if source == "news" %}
+- Positive: {{ data.positive_pct }}% | Negative: {{ data.negative_pct }}% | Neutral: {{ data.neutral_pct }}%
+- Articles analyzed: {{ data.article_count }}
+{% elif source == "reddit" %}
+- Posts: {{ data.post_count }} | Avg Score: {{ data.avg_score }} | Avg Upvote: {{ data.avg_upvote_ratio }}
+{% endif %}
+{% endfor %}
+{% endif %}

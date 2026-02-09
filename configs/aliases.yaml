@@ -1,0 +1,39 @@
+# Ticker Aliases — maps common names to canonical ticker symbols
+TSMC: TSM
+"Taiwan Semiconductor": TSM
+"Tokyo Electron": 8035.T
+TEL: 8035.T
+Lasertec: 6920.T
+Advantest: 6857.T
+"Shin-Etsu": 4063.T
+Ajinomoto: 2801.T
+Murata: 6981.T
+TDK: 6762.T
+Nidec: 6594.T
+Hamamatsu: 7741.T
+Disco: 6146.T
+"Screen Holdings": 7735.T
+SUMCO: 3436.T
+JSR: 4185.T
+TOK: 4186.T
+Fujifilm: 4901.T
+Resonac: 4004.T
+Ibiden: 4062.T
+Shinko: 6967.T
+"SK Hynix": 000660.KS
+Hynix: 000660.KS
+Micron: MU
+Synopsys: SNPS
+Cadence: CDNS
+ARM: ARM
+Broadcom: AVGO
+Arista: ANET
+Vertiv: VRT
+"Monolithic Power": MPWR
+Amphenol: APH
+Entegris: ENTG
+Linde: LIN
+"Lam Research": LRCX
+"Applied Materials": AMAT
+KLA: KLAC
+Unimicron: 3037.TW

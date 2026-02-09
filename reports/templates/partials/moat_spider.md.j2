@@ -1,0 +1,8 @@
+## Competitive Moat
+
+**Moat Classification: {{ moat.moat_classification }}** (Score: {{ moat.composite_moat_score }}/100)
+
+| Dimension | Score |
+|-----------|-------|
+{% for dim, score in moat.dimension_scores.items() %}| {{ dim | replace("_"," ") | title }} | {{ score }}/100 |
+{% endfor %}

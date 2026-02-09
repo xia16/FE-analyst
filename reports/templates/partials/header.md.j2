@@ -1,0 +1,4 @@
+# {{ ctx.profile_name | replace("_"," ") | title }} Report: {{ ctx.tickers | join(", ") }}
+*Generated: {{ now.strftime("%Y-%m-%d %H:%M") }}*
+
+---

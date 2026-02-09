@@ -1,0 +1,40 @@
+{% include "partials/header.md.j2" %}
+
+## Scores & Recommendations
+
+| Ticker | Company | Score | Recommendation |
+|--------|---------|-------|---------------|
+{% for ticker in ctx.tickers %}{% set profile = ctx.fundamentals_data.get(ticker, {}).get("profile", {}) %}{% set score = ctx.scores.get(ticker, {}) %}| {{ ticker }} | {{ profile.get("name", ticker) }} | **{{ score.get("composite_score", "—") }}** | {{ score.get("recommendation", "—") }} |
+{% endfor %}
+
+## Valuation
+
+| Ticker | P/E (Fwd) | P/B | EV/EBITDA | Profit Margin | ROE |
+|--------|-----------|-----|-----------|---------------|-----|
+{% for ticker in ctx.tickers %}{% set r = ctx.fundamentals_data.get(ticker, {}).get("ratios", {}) %}| {{ ticker }} | {{ r.pe_forward | fmt_ratio }} | {{ r.pb_ratio | fmt_ratio }} | {{ r.ev_ebitda | fmt_ratio }} | {{ r.profit_margin | fmt_pct }} | {{ r.roe | fmt_pct }} |
+{% endfor %}
+
+## Growth & Financial Health
+
+| Ticker | Rev Growth | Earnings Growth | D/E | Current Ratio |
+|--------|-----------|-----------------|-----|---------------|
+{% for ticker in ctx.tickers %}{% set r = ctx.fundamentals_data.get(ticker, {}).get("ratios", {}) %}| {{ ticker }} | {{ r.revenue_growth | fmt_pct }} | {{ r.earnings_growth | fmt_pct }} | {{ r.debt_to_equity | fmt_ratio }} | {{ r.current_ratio | fmt_ratio }} |
+{% endfor %}
+
+## Risk Profile
+
+| Ticker | Volatility | Beta | Sharpe | Max Drawdown |
+|--------|-----------|------|--------|-------------|
+{% for ticker in ctx.tickers %}{% set risk = ctx.get_analysis(ticker, "risk") or {} %}| {{ ticker }} | {{ risk.get("volatility", "—") }} | {{ risk.get("beta", "—") }} | {{ risk.get("sharpe_ratio", "—") }} | {{ risk.get("max_drawdown", "—") }} |
+{% endfor %}
+
+## Technical Signals
+
+{% for ticker in ctx.tickers %}
+{% set tech = ctx.get_analysis(ticker, "technical") %}
+{% if tech and tech.get("signals") %}
+**{{ ticker }}:** {% for name, sig in tech.signals.items() %}{{ name | upper }}={{ sig.signal }} {% endfor %}
+{% endif %}
+{% endfor %}
+
+{% include "partials/disclaimer.md.j2" %}

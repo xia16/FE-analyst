@@ -1,0 +1,6 @@
+## Peer Comparison
+
+| Ticker | Score | Recommendation |
+|--------|-------|---------------|
+{% for t, s in ctx.scores.items() %}| {{ t }} | **{{ s.composite_score }}** | {{ s.recommendation }} |
+{% endfor %}

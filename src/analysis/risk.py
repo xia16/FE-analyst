@@ -98,3 +98,22 @@ class RiskAnalyzer:
     def _conditional_var(returns: pd.Series, confidence: float = 0.95) -> float:
         var = np.percentile(returns, (1 - confidence) * 100)
         return round(float(returns[returns <= var].mean()), 4)
+
+
+# --- Plugin adapter for pipeline ---
+from src.analysis.base import BaseAnalyzer as _BaseAnalyzer
+
+
+class RiskAnalyzerPlugin(_BaseAnalyzer):
+    name = "risk"
+    default_weight = 0.15
+
+    def __init__(self):
+        self._analyzer = RiskAnalyzer()
+
+    def analyze(self, ticker, ctx):
+        result = self._analyzer.analyze(ticker)
+        vol = result.get("volatility", 0.3)
+        score = max(0, min(100, (1 - vol) * 100))
+        result["score"] = round(score, 1)
+        return result

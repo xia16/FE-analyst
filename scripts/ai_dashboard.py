@@ -42,16 +42,12 @@ def load_companies(category: str = "", japan_only: bool = False) -> list[dict]:
             continue
         if not isinstance(cat_data, dict):
             continue
-        for key, val in cat_data.items():
-            if key == "description":
-                continue
-            if isinstance(val, list):
-                for item in val:
-                    if isinstance(item, dict) and "ticker" in item:
-                        if japan_only and item.get("country") != "JP":
-                            continue
-                        item["category"] = cat_name
-                        companies.append(item)
+        for item in cat_data.get("companies", []):
+            if isinstance(item, dict) and "ticker" in item:
+                if japan_only and item.get("country") != "JP":
+                    continue
+                item["category"] = cat_name
+                companies.append(item)
 
     return companies
 

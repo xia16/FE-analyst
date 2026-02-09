@@ -1,0 +1,19 @@
+## Key Financial Ratios
+
+| Metric | Value |
+|--------|-------|
+{% if ratios.pe_trailing is not none %}| P/E (Trailing) | {{ ratios.pe_trailing | fmt_ratio }} |
+{% endif %}{% if ratios.pe_forward is not none %}| P/E (Forward) | {{ ratios.pe_forward | fmt_ratio }} |
+{% endif %}{% if ratios.peg_ratio is not none %}| PEG Ratio | {{ ratios.peg_ratio | fmt_ratio }} |
+{% endif %}{% if ratios.pb_ratio is not none %}| P/B Ratio | {{ ratios.pb_ratio | fmt_ratio }} |
+{% endif %}{% if ratios.ev_ebitda is not none %}| EV/EBITDA | {{ ratios.ev_ebitda | fmt_ratio }} |
+{% endif %}{% if ratios.profit_margin is not none %}| Profit Margin | {{ ratios.profit_margin | fmt_pct }} |
+{% endif %}{% if ratios.operating_margin is not none %}| Operating Margin | {{ ratios.operating_margin | fmt_pct }} |
+{% endif %}{% if ratios.roe is not none %}| ROE | {{ ratios.roe | fmt_pct }} |
+{% endif %}{% if ratios.roa is not none %}| ROA | {{ ratios.roa | fmt_pct }} |
+{% endif %}{% if ratios.revenue_growth is not none %}| Revenue Growth | {{ ratios.revenue_growth | fmt_pct }} |
+{% endif %}{% if ratios.earnings_growth is not none %}| Earnings Growth | {{ ratios.earnings_growth | fmt_pct }} |
+{% endif %}{% if ratios.debt_to_equity is not none %}| Debt/Equity | {{ ratios.debt_to_equity | fmt_ratio }} |
+{% endif %}{% if ratios.current_ratio is not none %}| Current Ratio | {{ ratios.current_ratio | fmt_ratio }} |
+{% endif %}{% if ratios.dividend_yield is not none %}| Dividend Yield | {{ ratios.dividend_yield | fmt_pct }} |
+{% endif %}

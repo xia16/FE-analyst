@@ -129,3 +129,24 @@ class FundamentalAnalyzer:
                 reasons.append(f"Expensive PEG: {peg:.2f}")
 
         return {"score": score, "max_score": 4, "reasons": reasons}
+
+
+# --- Plugin adapter for pipeline ---
+from src.analysis.base import BaseAnalyzer as _BaseAnalyzer
+
+
+class FundamentalAnalyzerPlugin(_BaseAnalyzer):
+    name = "fundamental"
+    default_weight = 0.25
+
+    def __init__(self):
+        self._analyzer = FundamentalAnalyzer()
+
+    def analyze(self, ticker, ctx):
+        result = self._analyzer.analyze(ticker)
+        health = result["health"]["score"] / max(result["health"]["max_score"], 1)
+        growth = result["growth"]["score"] / max(result["growth"]["max_score"], 1)
+        val = result["valuation"]["score"] / max(result["valuation"]["max_score"], 1)
+        score = (health * 0.4 + growth * 0.3 + val * 0.3) * 100
+        result["score"] = round(score, 1)
+        return result

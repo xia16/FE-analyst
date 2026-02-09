@@ -1,0 +1,43 @@
+# Run Profiles — controls which steps and analyzers run for each mode
+
+quick:
+  description: "Fast overview: price + fundamentals + key scores"
+  template: quick.md.j2
+  steps:
+    - fetch_price_data
+    - fetch_fundamentals
+  analyzers: [technical, fundamental, moat]
+
+full:
+  description: "Complete analysis with all data sources and analyzers"
+  template: deep_dive.md.j2
+  steps:
+    - fetch_price_data
+    - fetch_fundamentals
+    - fetch_news
+  analyzers: all
+
+deep_dive:
+  description: "Deep investment memo with DCF, peer comp, full financials"
+  template: deep_dive.md.j2
+  steps:
+    - fetch_price_data
+    - fetch_fundamentals
+    - fetch_news
+  analyzers: [technical, fundamental, valuation, risk, sentiment, moat]
+
+comparison:
+  description: "Side-by-side comparison of multiple tickers"
+  template: comparison.md.j2
+  steps:
+    - fetch_price_data
+    - fetch_fundamentals
+  analyzers: [technical, fundamental, risk, moat]
+
+screening:
+  description: "Universe scan and ranking"
+  template: screening.md.j2
+  steps:
+    - fetch_price_data
+    - fetch_fundamentals
+  analyzers: [fundamental, moat]

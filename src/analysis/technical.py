@@ -113,3 +113,26 @@ class TechnicalAnalyzer:
             "support": float(lows.iloc[-1]),
             "current": float(df["Close"].iloc[-1]),
         }
+
+
+# --- Plugin adapter for pipeline ---
+from src.analysis.base import BaseAnalyzer as _BaseAnalyzer
+
+
+class TechnicalAnalyzerPlugin(_BaseAnalyzer):
+    name = "technical"
+    default_weight = 0.20
+
+    def __init__(self):
+        self._analyzer = TechnicalAnalyzer()
+
+    def analyze(self, ticker, ctx):
+        df = ctx.price_data.get(ticker)
+        if df is None or df.empty:
+            return {"error": "No price data", "score": 50}
+        signals = self._analyzer.get_signals(df)
+        support_res = self._analyzer.get_support_resistance(df)
+        buy_count = sum(1 for s in signals.values() if s.get("signal") == "BUY")
+        total = max(len(signals), 1)
+        score = (buy_count / total) * 100
+        return {"signals": signals, "support_resistance": support_res, "score": round(score, 1)}

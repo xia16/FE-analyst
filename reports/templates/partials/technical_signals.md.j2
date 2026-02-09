@@ -1,0 +1,12 @@
+## Technical Analysis
+
+| Indicator | Signal | Detail |
+|-----------|--------|--------|
+{% for name, sig in tech.signals.items() %}| {{ name | upper }} | **{{ sig.signal }}** | {{ sig.get("reason", "") }} |
+{% endfor %}
+
+{% if tech.support_resistance %}
+- **Current Price:** {{ "%.2f" | format(tech.support_resistance.current) }}
+- **Support:** {{ "%.2f" | format(tech.support_resistance.support) }}
+- **Resistance:** {{ "%.2f" | format(tech.support_resistance.resistance) }}
+{% endif %}

@@ -71,3 +71,21 @@ class SentimentAnalyzer:
             results["overall_label"] = "NO DATA"
 
         return results
+
+
+# --- Plugin adapter for pipeline ---
+from src.analysis.base import BaseAnalyzer as _BaseAnalyzer
+
+
+class SentimentAnalyzerPlugin(_BaseAnalyzer):
+    name = "sentiment"
+    default_weight = 0.10
+
+    def __init__(self):
+        self._analyzer = SentimentAnalyzer()
+
+    def analyze(self, ticker, ctx):
+        result = self._analyzer.analyze(ticker)
+        score = max(0, min(100, 50 + result.get("overall_score", 0) * 100))
+        result["score"] = round(score, 1)
+        return result

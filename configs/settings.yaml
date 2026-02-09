@@ -3,10 +3,10 @@
 
 app:
   name: FE-Analyst
-  version: "0.1.0"
+  version: "0.2.0"
   log_level: INFO
 
-# Data source priorities (order = fallback priority)
+# Data source priorities
 data_sources:
   market_data:
     primary: yfinance
@@ -25,13 +25,52 @@ cache:
   ttl_hours:
     price_daily: 1
     price_historical: 24
-    fundamentals: 168    # 1 week
-    sec_filings: 720     # 30 days
+    fundamentals: 168
+    sec_filings: 720
     macro_data: 24
     news: 1
 
-# Analysis defaults
+# ============================================================
+# ANALYZER REGISTRY (Plugin System)
+# To add a new analyzer:
+#   1. Create src/analysis/your_module.py with BaseAnalyzer subclass
+#   2. Add entry here
+#   3. Done — auto-discovered, scored, and rendered
+# ============================================================
 analysis:
+  registry:
+    technical:
+      module: src.analysis.technical
+      class: TechnicalAnalyzerPlugin
+      weight: 0.20
+      enabled: true
+    fundamental:
+      module: src.analysis.fundamental
+      class: FundamentalAnalyzerPlugin
+      weight: 0.25
+      enabled: true
+    valuation:
+      module: src.analysis.valuation
+      class: ValuationAnalyzerPlugin
+      weight: 0.20
+      enabled: true
+    risk:
+      module: src.analysis.risk
+      class: RiskAnalyzerPlugin
+      weight: 0.15
+      enabled: true
+    sentiment:
+      module: src.analysis.sentiment
+      class: SentimentAnalyzerPlugin
+      weight: 0.10
+      enabled: false  # disable by default (requires FinBERT download)
+    moat:
+      module: src.analysis.moat
+      class: MoatAnalyzerPlugin
+      weight: 0.10
+      enabled: true
+
+  # Per-analyzer settings
   technical:
     default_period: "1y"
     indicators: [sma, ema, rsi, macd, bbands, atr, obv]
@@ -39,7 +78,7 @@ analysis:
     min_years: 3
     peer_count: 5
   valuation:
-    risk_free_rate: auto   # pulls from FRED
+    risk_free_rate: auto
     market_premium: 0.06
   sentiment:
     model: ProsusAI/finbert

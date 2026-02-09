@@ -131,3 +131,25 @@ class ValuationAnalyzer:
                 }
 
         return {"ticker": ticker, "peers": peers, "comparison": comparison}
+
+
+# --- Plugin adapter for pipeline ---
+from src.analysis.base import BaseAnalyzer as _BaseAnalyzer
+
+
+class ValuationAnalyzerPlugin(_BaseAnalyzer):
+    name = "valuation"
+    default_weight = 0.20
+
+    def __init__(self):
+        self._analyzer = ValuationAnalyzer()
+
+    def analyze(self, ticker, ctx):
+        try:
+            dcf = self._analyzer.dcf_valuation(ticker)
+        except Exception:
+            dcf = {"error": "DCF failed"}
+        mos = dcf.get("margin_of_safety_pct", 0)
+        score = max(0, min(100, 50 + mos))
+        dcf["score"] = round(score, 1)
+        return dcf

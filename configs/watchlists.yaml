@@ -1,0 +1,51 @@
+# User Watchlists — edit here, no code changes needed
+
+default:
+  - ASML
+  - TSM
+  - 8035.T
+  - 6920.T
+  - SNPS
+  - CDNS
+
+japan_champions:
+  - 8035.T     # Tokyo Electron
+  - 6920.T     # Lasertec
+  - 6857.T     # Advantest
+  - 4063.T     # Shin-Etsu
+  - 2801.T     # Ajinomoto
+  - 6981.T     # Murata
+  - 7741.T     # Hamamatsu
+  - 6146.T     # Disco
+
+euv_chain:
+  - ASML
+  - 6920.T
+  - 4063.T
+  - 4185.T
+  - 4186.T
+
+hbm_players:
+  - 000660.KS
+  - MU
+  - TSM
+
+packaging:
+  - 2801.T     # Ajinomoto (ABF film)
+  - 4062.T     # Ibiden
+  - 6967.T     # Shinko Electric
+
+semicon_equipment:
+  - ASML
+  - 8035.T
+  - LRCX
+  - AMAT
+  - KLAC
+  - 6857.T
+  - 6920.T
+  - 6146.T
+
+eda_design:
+  - SNPS
+  - CDNS
+  - ARM

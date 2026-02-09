@@ -38,24 +38,15 @@ def load_universe(category_filter: str = "") -> list[dict]:
         data = yaml.safe_load(f)
 
     companies = []
-    for cat_name, cat_items in data.get("categories", {}).items():
+    for cat_name, cat_data in data.get("categories", {}).items():
         if category_filter and cat_name != category_filter:
             continue
-        desc = ""
-        for item in cat_items if isinstance(cat_items, list) else []:
-            pass
-        # Handle the yaml structure - items are mixed with description
-        if isinstance(cat_items, dict):
-            desc = cat_items.get("description", "")
-            items = [v for v in cat_items.values() if isinstance(v, dict) and "ticker" in v]
-        elif isinstance(cat_items, list):
-            items = [v for v in cat_items if isinstance(v, dict) and "ticker" in v]
-        else:
+        if not isinstance(cat_data, dict):
             continue
-
-        for item in items:
-            item["category"] = cat_name
-            companies.append(item)
+        for item in cat_data.get("companies", []):
+            if isinstance(item, dict) and "ticker" in item:
+                item["category"] = cat_name
+                companies.append(item)
 
     return companies
 
@@ -78,20 +69,11 @@ def parse_universe_yaml(category_filter: str = "") -> list[dict]:
 
         desc = cat_data.get("description", cat_name)
 
-        # Iterate through items that aren't 'description'
-        for key, val in cat_data.items():
-            if key == "description":
-                continue
-            if isinstance(val, list):
-                for item in val:
-                    if isinstance(item, dict) and "ticker" in item:
-                        item["category"] = cat_name
-                        item["category_desc"] = desc
-                        companies.append(item)
-            elif isinstance(val, dict) and "ticker" in val:
-                val["category"] = cat_name
-                val["category_desc"] = desc
-                companies.append(val)
+        for item in cat_data.get("companies", []):
+            if isinstance(item, dict) and "ticker" in item:
+                item["category"] = cat_name
+                item["category_desc"] = desc
+                companies.append(item)
 
     # If no companies found, try flat list parsing
     if not companies:
