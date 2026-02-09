@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+eggs/
+*.egg
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Environment variables (contains API keys)
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data cache
+data/cache/
+data/raw/*.csv
+data/raw/*.json
+data/raw/*.parquet
+!data/raw/.gitkeep
+!data/cache/.gitkeep
+
+# Reports output
+reports/output/
+!reports/output/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Model artifacts
+models/*.bin
+models/*.pt
+models/*.onnx
+!models/.gitkeep

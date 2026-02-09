@@ -1,0 +1,63 @@
+# =============================================
+# FE-Analyst Dependencies
+# =============================================
+
+# --- Core ---
+pandas>=2.0
+numpy>=1.24
+python-dotenv>=1.0
+
+# --- Market Data ---
+yfinance>=0.2.30
+finnhub-python>=2.4
+alpaca-py>=0.20
+
+# --- Fundamental Data ---
+simfin>=0.9
+
+# --- SEC Filings ---
+edgartools>=2.0
+sec-edgar-downloader>=5.0
+
+# --- Technical Analysis ---
+ta>=0.11
+mplfinance>=0.12
+
+# --- Screening ---
+finvizfinance>=0.14
+
+# --- Economic / Macro ---
+fredapi>=0.5
+wbdata>=1.0
+pandas-datareader>=0.10
+
+# --- News & Sentiment ---
+transformers>=4.35
+torch>=2.0
+finvader>=1.0
+
+# --- Alternative Data ---
+praw>=7.7
+
+# --- Visualization ---
+matplotlib>=3.7
+plotly>=5.18
+seaborn>=0.13
+
+# --- Reports ---
+jinja2>=3.1
+tabulate>=0.9
+
+# --- Utilities ---
+requests>=2.31
+aiohttp>=3.9
+tqdm>=4.66
+cachetools>=5.3
+ratelimit>=2.2
+
+# --- Dev / Testing ---
+pytest>=7.4
+ipykernel>=6.25
+jupyter>=1.0
+black>=23.0
+ruff>=0.1

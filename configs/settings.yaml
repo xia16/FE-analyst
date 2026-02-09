@@ -1,0 +1,55 @@
+# FE-Analyst Configuration
+# ========================
+
+app:
+  name: FE-Analyst
+  version: "0.1.0"
+  log_level: INFO
+
+# Data source priorities (order = fallback priority)
+data_sources:
+  market_data:
+    primary: yfinance
+    fallback: [finnhub, alpaca]
+  fundamentals:
+    primary: simfin
+    fallback: [finnhub, fmp]
+  news:
+    primary: finnhub
+    fallback: []
+
+# Cache settings
+cache:
+  enabled: true
+  directory: data/cache
+  ttl_hours:
+    price_daily: 1
+    price_historical: 24
+    fundamentals: 168    # 1 week
+    sec_filings: 720     # 30 days
+    macro_data: 24
+    news: 1
+
+# Analysis defaults
+analysis:
+  technical:
+    default_period: "1y"
+    indicators: [sma, ema, rsi, macd, bbands, atr, obv]
+  fundamental:
+    min_years: 3
+    peer_count: 5
+  valuation:
+    risk_free_rate: auto   # pulls from FRED
+    market_premium: 0.06
+  sentiment:
+    model: ProsusAI/finbert
+    batch_size: 16
+  risk:
+    var_confidence: 0.95
+    lookback_days: 252
+
+# Report settings
+reports:
+  output_dir: reports/output
+  template_dir: reports/templates
+  default_format: markdown
