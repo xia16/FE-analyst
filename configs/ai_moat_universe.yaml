@@ -1,0 +1,466 @@
+# ============================================================
+# AI Production Moat Universe
+# Companies holding critical bottleneck positions in AI supply chain
+# ============================================================
+# Moat scores are qualitative assessments (0-100):
+#   market_dominance: market share in niche
+#   switching_costs: difficulty to replace
+#   technology_lockin: proprietary IP/tech
+#   supply_chain_criticality: bottleneck severity
+#   barriers_to_entry: capital/knowledge/regulatory barriers
+# ============================================================
+
+categories:
+
+  # =====================================================
+  # 1. SEMICONDUCTOR EQUIPMENT (Japan dominance)
+  # =====================================================
+  semiconductor_equipment:
+    description: "Machines that manufacture AI chips"
+
+    - ticker: "8035.T"
+      name: "Tokyo Electron"
+      adr: "TOELY"
+      country: JP
+      moat: "Coater/developer, etch, deposition tools. #3 global semicon equipment"
+      ai_exposure_pct: 45
+      market_dominance: 85
+      switching_costs: 90
+      technology_lockin: 85
+      supply_chain_criticality: 90
+      barriers_to_entry: 90
+
+    - ticker: "6920.T"
+      name: "Lasertec"
+      country: JP
+      moat: "ONLY company making EUV mask inspection tools. 100% monopoly"
+      ai_exposure_pct: 70
+      market_dominance: 100
+      switching_costs: 100
+      technology_lockin: 95
+      supply_chain_criticality: 100
+      barriers_to_entry: 95
+
+    - ticker: "6857.T"
+      name: "Advantest"
+      adr: "ATEYY"
+      country: JP
+      moat: "ATE (chip testing). #1 global with ~50% market share in SoC testers"
+      ai_exposure_pct: 55
+      market_dominance: 85
+      switching_costs: 85
+      technology_lockin: 80
+      supply_chain_criticality: 85
+      barriers_to_entry: 85
+
+    - ticker: "6146.T"
+      name: "Disco Corporation"
+      country: JP
+      moat: "Dicing/grinding machines. ~80% global share in wafer dicing"
+      ai_exposure_pct: 40
+      market_dominance: 90
+      switching_costs: 85
+      technology_lockin: 80
+      supply_chain_criticality: 80
+      barriers_to_entry: 85
+
+    - ticker: "7735.T"
+      name: "Screen Holdings"
+      country: JP
+      moat: "Wafer cleaning equipment. ~50% global share"
+      ai_exposure_pct: 35
+      market_dominance: 80
+      switching_costs: 80
+      technology_lockin: 75
+      supply_chain_criticality: 75
+      barriers_to_entry: 80
+
+    - ticker: "ASML"
+      name: "ASML Holding"
+      country: NL
+      moat: "EUV lithography monopoly. Literally only supplier on earth"
+      ai_exposure_pct: 50
+      market_dominance: 100
+      switching_costs: 100
+      technology_lockin: 100
+      supply_chain_criticality: 100
+      barriers_to_entry: 100
+
+    - ticker: "LRCX"
+      name: "Lam Research"
+      country: US
+      moat: "Etch & deposition equipment. ~45% etch market share"
+      ai_exposure_pct: 40
+      market_dominance: 80
+      switching_costs: 85
+      technology_lockin: 80
+      supply_chain_criticality: 85
+      barriers_to_entry: 85
+
+    - ticker: "AMAT"
+      name: "Applied Materials"
+      country: US
+      moat: "Largest semicon equipment company. Deposition, etch, CMP"
+      ai_exposure_pct: 35
+      market_dominance: 75
+      switching_costs: 80
+      technology_lockin: 80
+      supply_chain_criticality: 80
+      barriers_to_entry: 85
+
+    - ticker: "KLAC"
+      name: "KLA Corporation"
+      country: US
+      moat: "Process control & inspection. ~55% market share"
+      ai_exposure_pct: 40
+      market_dominance: 85
+      switching_costs: 85
+      technology_lockin: 85
+      supply_chain_criticality: 85
+      barriers_to_entry: 85
+
+  # =====================================================
+  # 2. SPECIALTY CHEMICALS & MATERIALS
+  # =====================================================
+  chemicals_materials:
+    description: "Essential chemicals and materials for chip fabrication"
+
+    - ticker: "4063.T"
+      name: "Shin-Etsu Chemical"
+      adr: "SHECY"
+      country: JP
+      moat: "World #1 silicon wafers (~30% share) + #1 photoresists. Irreplaceable"
+      ai_exposure_pct: 50
+      market_dominance: 90
+      switching_costs: 90
+      technology_lockin: 85
+      supply_chain_criticality: 95
+      barriers_to_entry: 90
+
+    - ticker: "3436.T"
+      name: "SUMCO"
+      country: JP
+      moat: "#2 silicon wafer manufacturer globally (~25% share)"
+      ai_exposure_pct: 45
+      market_dominance: 80
+      switching_costs: 85
+      technology_lockin: 75
+      supply_chain_criticality: 85
+      barriers_to_entry: 85
+
+    - ticker: "4185.T"
+      name: "JSR Corporation"
+      country: JP
+      moat: "EUV photoresists leader. ~30% global photoresist share"
+      ai_exposure_pct: 55
+      market_dominance: 85
+      switching_costs: 90
+      technology_lockin: 90
+      supply_chain_criticality: 90
+      barriers_to_entry: 85
+
+    - ticker: "4186.T"
+      name: "Tokyo Ohka Kogyo (TOK)"
+      country: JP
+      moat: "EUV/ArF photoresists. Top 3 globally"
+      ai_exposure_pct: 50
+      market_dominance: 75
+      switching_costs: 85
+      technology_lockin: 85
+      supply_chain_criticality: 85
+      barriers_to_entry: 80
+
+    - ticker: "4901.T"
+      name: "Fujifilm Holdings"
+      adr: "FUJIY"
+      country: JP
+      moat: "Advanced semiconductor materials, CMP slurries, photoresists"
+      ai_exposure_pct: 20
+      market_dominance: 70
+      switching_costs: 75
+      technology_lockin: 75
+      supply_chain_criticality: 70
+      barriers_to_entry: 75
+
+    - ticker: "4004.T"
+      name: "Resonac (Showa Denko)"
+      country: JP
+      moat: "SiC epitaxial wafers, specialty gases, CMP slurries, encapsulants"
+      ai_exposure_pct: 35
+      market_dominance: 70
+      switching_costs: 80
+      technology_lockin: 75
+      supply_chain_criticality: 75
+      barriers_to_entry: 75
+
+    - ticker: "ENTG"
+      name: "Entegris"
+      country: US
+      moat: "Contamination control, CMP slurries (acquired CMC Materials), filters"
+      ai_exposure_pct: 40
+      market_dominance: 80
+      switching_costs: 85
+      technology_lockin: 80
+      supply_chain_criticality: 85
+      barriers_to_entry: 80
+
+    - ticker: "LIN"
+      name: "Linde plc"
+      country: IE
+      moat: "Industrial gases for fab operations. #1 globally"
+      ai_exposure_pct: 15
+      market_dominance: 75
+      switching_costs: 70
+      technology_lockin: 60
+      supply_chain_criticality: 70
+      barriers_to_entry: 80
+
+  # =====================================================
+  # 3. ADVANCED PACKAGING & SUBSTRATES
+  # =====================================================
+  packaging_substrates:
+    description: "Critical for CoWoS, HBM, and AI chip packaging"
+
+    - ticker: "2801.T"
+      name: "Ajinomoto"
+      country: JP
+      moat: "ABF substrate film (Ajinomoto Build-up Film). ~100% monopoly for advanced substrates"
+      ai_exposure_pct: 15
+      market_dominance: 100
+      switching_costs: 95
+      technology_lockin: 90
+      supply_chain_criticality: 100
+      barriers_to_entry: 90
+
+    - ticker: "4062.T"
+      name: "Ibiden"
+      country: JP
+      moat: "IC package substrates (ABF substrates). Top 2 globally"
+      ai_exposure_pct: 50
+      market_dominance: 80
+      switching_costs: 85
+      technology_lockin: 80
+      supply_chain_criticality: 90
+      barriers_to_entry: 85
+
+    - ticker: "6967.T"
+      name: "Shinko Electric Industries"
+      country: JP
+      moat: "FC-BGA substrates for high-end processors. Top 3 globally"
+      ai_exposure_pct: 55
+      market_dominance: 75
+      switching_costs: 80
+      technology_lockin: 75
+      supply_chain_criticality: 85
+      barriers_to_entry: 80
+
+    - ticker: "3037.TW"
+      name: "Unimicron Technology"
+      country: TW
+      moat: "ABF substrates and HDI PCBs. #1 PCB maker globally"
+      ai_exposure_pct: 40
+      market_dominance: 75
+      switching_costs: 75
+      technology_lockin: 70
+      supply_chain_criticality: 80
+      barriers_to_entry: 75
+
+  # =====================================================
+  # 4. ELECTRONIC COMPONENTS (AI server critical)
+  # =====================================================
+  electronic_components:
+    description: "Components essential for AI server infrastructure"
+
+    - ticker: "6981.T"
+      name: "Murata Manufacturing"
+      adr: "MRAAY"
+      country: JP
+      moat: "MLCCs (ceramic capacitors). ~40% global share. Every AI chip needs them"
+      ai_exposure_pct: 25
+      market_dominance: 85
+      switching_costs: 75
+      technology_lockin: 80
+      supply_chain_criticality: 80
+      barriers_to_entry: 80
+
+    - ticker: "6762.T"
+      name: "TDK Corporation"
+      adr: "TTDKY"
+      country: JP
+      moat: "MLCCs, inductors, sensors. #2 passive components"
+      ai_exposure_pct: 20
+      market_dominance: 70
+      switching_costs: 70
+      technology_lockin: 70
+      supply_chain_criticality: 70
+      barriers_to_entry: 75
+
+    - ticker: "6594.T"
+      name: "Nidec Corporation"
+      adr: "NJDCY"
+      country: JP
+      moat: "#1 precision motors globally. Critical for cooling (liquid cooling for AI servers)"
+      ai_exposure_pct: 15
+      market_dominance: 75
+      switching_costs: 70
+      technology_lockin: 70
+      supply_chain_criticality: 65
+      barriers_to_entry: 70
+
+    - ticker: "7741.T"
+      name: "Hamamatsu Photonics"
+      country: JP
+      moat: "Photon sensors, image sensors. ~90% market share in photomultiplier tubes"
+      ai_exposure_pct: 20
+      market_dominance: 90
+      switching_costs: 85
+      technology_lockin: 90
+      supply_chain_criticality: 70
+      barriers_to_entry: 90
+
+  # =====================================================
+  # 5. EDA & CHIP DESIGN IP
+  # =====================================================
+  eda_design:
+    description: "Software and IP without which no AI chip can be designed"
+
+    - ticker: "SNPS"
+      name: "Synopsys"
+      country: US
+      moat: "EDA tools duopoly. ~33% market share. Every chip designed with their tools"
+      ai_exposure_pct: 60
+      market_dominance: 85
+      switching_costs: 95
+      technology_lockin: 95
+      supply_chain_criticality: 90
+      barriers_to_entry: 95
+
+    - ticker: "CDNS"
+      name: "Cadence Design Systems"
+      country: US
+      moat: "EDA tools duopoly. ~32% market share"
+      ai_exposure_pct: 55
+      market_dominance: 85
+      switching_costs: 95
+      technology_lockin: 95
+      supply_chain_criticality: 90
+      barriers_to_entry: 95
+
+    - ticker: "ARM"
+      name: "ARM Holdings"
+      country: GB
+      moat: "CPU architecture IP. 99% of mobile, growing in AI inference"
+      ai_exposure_pct: 30
+      market_dominance: 90
+      switching_costs: 90
+      technology_lockin: 90
+      supply_chain_criticality: 75
+      barriers_to_entry: 90
+
+  # =====================================================
+  # 6. NETWORKING & INTERCONNECT (AI data center)
+  # =====================================================
+  networking:
+    description: "Connectivity fabric for AI training clusters"
+
+    - ticker: "AVGO"
+      name: "Broadcom"
+      country: US
+      moat: "Networking ASICs, custom AI chips (Google TPU), Tomahawk switches"
+      ai_exposure_pct: 35
+      market_dominance: 80
+      switching_costs: 85
+      technology_lockin: 85
+      supply_chain_criticality: 80
+      barriers_to_entry: 85
+
+    - ticker: "ANET"
+      name: "Arista Networks"
+      country: US
+      moat: "AI data center networking. ~70% of cloud titan switching"
+      ai_exposure_pct: 50
+      market_dominance: 75
+      switching_costs: 80
+      technology_lockin: 80
+      supply_chain_criticality: 75
+      barriers_to_entry: 75
+
+    - ticker: "APH"
+      name: "Amphenol"
+      country: US
+      moat: "High-speed connectors/cables. #2 globally. Essential for GPU interconnect"
+      ai_exposure_pct: 25
+      market_dominance: 70
+      switching_costs: 65
+      technology_lockin: 65
+      supply_chain_criticality: 70
+      barriers_to_entry: 65
+
+  # =====================================================
+  # 7. POWER & COOLING (AI infra bottleneck)
+  # =====================================================
+  power_cooling:
+    description: "Power delivery and thermal management for AI data centers"
+
+    - ticker: "VRT"
+      name: "Vertiv Holdings"
+      country: US
+      moat: "Data center power/cooling. #1 in thermal management for data centers"
+      ai_exposure_pct: 45
+      market_dominance: 70
+      switching_costs: 70
+      technology_lockin: 65
+      supply_chain_criticality: 70
+      barriers_to_entry: 65
+
+    - ticker: "MPWR"
+      name: "Monolithic Power Systems"
+      country: US
+      moat: "Power management ICs. Key supplier for AI GPU power delivery"
+      ai_exposure_pct: 40
+      market_dominance: 65
+      switching_costs: 75
+      technology_lockin: 75
+      supply_chain_criticality: 70
+      barriers_to_entry: 75
+
+  # =====================================================
+  # 8. FOUNDRY & MEMORY
+  # =====================================================
+  foundry_memory:
+    description: "Chip manufacturing and HBM memory"
+
+    - ticker: "2330.TW"
+      name: "Taiwan Semiconductor (TSMC)"
+      adr: "TSM"
+      country: TW
+      moat: "Only foundry capable of cutting-edge AI chips. ~90% advanced node share"
+      ai_exposure_pct: 50
+      market_dominance: 95
+      switching_costs: 100
+      technology_lockin: 95
+      supply_chain_criticality: 100
+      barriers_to_entry: 100
+
+    - ticker: "000660.KS"
+      name: "SK Hynix"
+      adr: "HXSCL"
+      country: KR
+      moat: "HBM (High Bandwidth Memory) leader. ~50% HBM market, key NVIDIA supplier"
+      ai_exposure_pct: 45
+      market_dominance: 85
+      switching_costs: 85
+      technology_lockin: 80
+      supply_chain_criticality: 90
+      barriers_to_entry: 90
+
+    - ticker: "MU"
+      name: "Micron Technology"
+      country: US
+      moat: "HBM3E memory. #3 in DRAM. Growing AI memory share"
+      ai_exposure_pct: 35
+      market_dominance: 70
+      switching_costs: 70
+      technology_lockin: 70
+      supply_chain_criticality: 75
+      barriers_to_entry: 85
