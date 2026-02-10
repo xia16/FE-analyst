@@ -1,76 +1,77 @@
-"""Sentiment analysis aggregator."""
+"""LLM-powered sentiment analysis aggregator.
 
-import pandas as pd
+Gathers raw data from news, Reddit, analyst recommendations, and insider
+trades, then passes everything to Claude for holistic sentiment analysis.
+"""
 
 from src.data_sources.news_sentiment import NewsSentimentClient
 from src.data_sources.alternative_data import AlternativeDataClient
+from src.data_sources.llm_sentiment import LLMSentimentClient
 from src.utils.logger import setup_logger
 
 logger = setup_logger("sentiment_analysis")
 
 
 class SentimentAnalyzer:
-    """Aggregate sentiment from multiple sources."""
+    """Gather multi-source data and analyze sentiment via LLM."""
 
     def __init__(self):
         self.news_client = NewsSentimentClient()
         self.alt_client = AlternativeDataClient()
+        self.llm_client = LLMSentimentClient()
 
     def analyze(self, ticker: str) -> dict:
-        """Get aggregate sentiment score from all sources."""
-        results = {"ticker": ticker, "sources": {}}
+        """Gather all data sources and run LLM sentiment analysis."""
+        logger.info("Gathering sentiment data for %s", ticker)
 
-        # News sentiment
-        news_df = self.news_client.get_news_with_sentiment(ticker)
-        if not news_df.empty and "sentiment_label" in news_df.columns:
-            counts = news_df["sentiment_label"].value_counts().to_dict()
-            total = len(news_df)
-            results["sources"]["news"] = {
-                "positive_pct": round(counts.get("positive", 0) / total * 100, 1),
-                "negative_pct": round(counts.get("negative", 0) / total * 100, 1),
-                "neutral_pct": round(counts.get("neutral", 0) / total * 100, 1),
-                "article_count": total,
-            }
+        # 1. Fetch news headlines
+        news = self.news_client.get_company_news(ticker)
+        logger.info("  News articles: %d", len(news))
 
-        # Reddit sentiment
-        reddit_posts = self.alt_client.get_reddit_sentiment(ticker)
-        if reddit_posts:
-            avg_score = sum(p["score"] for p in reddit_posts) / len(reddit_posts)
-            avg_ratio = sum(p["upvote_ratio"] for p in reddit_posts) / len(reddit_posts)
-            results["sources"]["reddit"] = {
-                "post_count": len(reddit_posts),
-                "avg_score": round(avg_score, 1),
-                "avg_upvote_ratio": round(avg_ratio, 3),
-            }
+        # 2. Fetch Reddit posts
+        reddit_posts = []
+        try:
+            reddit_posts = self.alt_client.get_reddit_sentiment(ticker)
+        except Exception as e:
+            logger.warning("  Reddit fetch failed: %s", e)
+        logger.info("  Reddit posts: %d", len(reddit_posts))
 
-        # Analyst recommendations
-        recs = self.alt_client.get_analyst_recommendations(ticker)
-        if recs is not None and not recs.empty:
-            latest = recs.iloc[:5]
-            results["sources"]["analysts"] = latest.to_dict("records")
+        # 3. Fetch analyst recommendations
+        analyst_recs = []
+        try:
+            recs_df = self.alt_client.get_analyst_recommendations(ticker)
+            if recs_df is not None and not recs_df.empty:
+                analyst_recs = recs_df.iloc[:10].to_dict("records")
+        except Exception as e:
+            logger.warning("  Analyst recs fetch failed: %s", e)
+        logger.info("  Analyst recommendations: %d", len(analyst_recs))
 
-        # Compute overall score (-1 to 1)
-        scores = []
-        if "news" in results["sources"]:
-            ns = results["sources"]["news"]
-            scores.append((ns["positive_pct"] - ns["negative_pct"]) / 100)
-        if "reddit" in results["sources"]:
-            rs = results["sources"]["reddit"]
-            scores.append(rs["avg_upvote_ratio"] - 0.5)  # normalize around 0
+        # 4. Fetch insider trades
+        insider_trades = []
+        try:
+            insider_trades = self.alt_client.get_insider_trades(ticker)
+        except Exception as e:
+            logger.warning("  Insider trades fetch failed: %s", e)
+        logger.info("  Insider trades: %d", len(insider_trades))
 
-        if scores:
-            results["overall_score"] = round(sum(scores) / len(scores), 3)
-            if results["overall_score"] > 0.2:
-                results["overall_label"] = "BULLISH"
-            elif results["overall_score"] < -0.2:
-                results["overall_label"] = "BEARISH"
-            else:
-                results["overall_label"] = "NEUTRAL"
-        else:
-            results["overall_score"] = 0
-            results["overall_label"] = "NO DATA"
+        # 5. Send everything to LLM for analysis
+        result = self.llm_client.analyze(
+            ticker=ticker,
+            news=news,
+            reddit_posts=reddit_posts,
+            analyst_recs=analyst_recs,
+            insider_trades=insider_trades,
+        )
 
-        return results
+        # Attach raw source counts for transparency
+        result["source_counts"] = {
+            "news_articles": len(news),
+            "reddit_posts": len(reddit_posts),
+            "analyst_recommendations": len(analyst_recs),
+            "insider_trades": len(insider_trades),
+        }
+
+        return result
 
 
 # --- Plugin adapter for pipeline ---
@@ -86,6 +87,8 @@ class SentimentAnalyzerPlugin(_BaseAnalyzer):
 
     def analyze(self, ticker, ctx):
         result = self._analyzer.analyze(ticker)
-        score = max(0, min(100, 50 + result.get("overall_score", 0) * 100))
+        # Convert -1..1 score to 0-100 scale for composite scoring
+        overall = result.get("overall_score", 0)
+        score = max(0, min(100, 50 + overall * 100))
         result["score"] = round(score, 1)
         return result

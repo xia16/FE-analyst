@@ -31,10 +31,8 @@ fredapi>=0.5
 wbdata>=1.0
 pandas-datareader>=0.10
 
-# --- News & Sentiment ---
-transformers>=4.35
-torch>=2.0
-finvader>=1.0
+# --- News & Sentiment (LLM-based) ---
+anthropic>=0.39
 
 # --- Alternative Data ---
 praw>=7.7
