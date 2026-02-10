@@ -3,7 +3,7 @@
 
 app:
   name: FE-Analyst
-  version: "0.2.0"
+  version: "0.3.0"
   log_level: INFO
 
 # Data source priorities
@@ -39,11 +39,6 @@ cache:
 # ============================================================
 analysis:
   registry:
-    technical:
-      module: src.analysis.technical
-      class: TechnicalAnalyzerPlugin
-      weight: 0.20
-      enabled: true
     fundamental:
       module: src.analysis.fundamental
       class: FundamentalAnalyzerPlugin
@@ -54,9 +49,19 @@ analysis:
       class: ValuationAnalyzerPlugin
       weight: 0.20
       enabled: true
+    technical:
+      module: src.analysis.technical
+      class: TechnicalAnalyzerPlugin
+      weight: 0.15
+      enabled: true
     risk:
       module: src.analysis.risk
       class: RiskAnalyzerPlugin
+      weight: 0.15
+      enabled: true
+    moat:
+      module: src.analysis.moat
+      class: MoatAnalyzerPlugin
       weight: 0.15
       enabled: true
     sentiment:
@@ -64,28 +69,58 @@ analysis:
       class: SentimentAnalyzerPlugin
       weight: 0.10
       enabled: false  # disable by default (requires FinBERT download)
-    moat:
-      module: src.analysis.moat
-      class: MoatAnalyzerPlugin
-      weight: 0.10
-      enabled: true
 
   # Per-analyzer settings
   technical:
     default_period: "1y"
-    indicators: [sma, ema, rsi, macd, bbands, atr, obv]
+    indicators: [sma, ema, rsi, macd, bbands, atr, obv, ichimoku, vwap, fibonacci, stochrsi, adx, cci, willr, pivots]
+    multi_timeframe: true
+    pattern_recognition: true
+    divergence_detection: true
+    volume_profiling: true
   fundamental:
-    min_years: 3
+    min_years: 5
     peer_count: 5
+    models: [piotroski, altman_z, dupont, quality_of_earnings, capital_allocation, working_capital]
   valuation:
     risk_free_rate: auto
     market_premium: 0.06
+    dcf_stages: 3
+    monte_carlo_simulations: 5000
+    sensitivity_analysis: true
+    comparable_multiples: [pe, ev_ebitda, pb, ps, pfcf]
   sentiment:
     model: ProsusAI/finbert
     batch_size: 16
+    sources: [news, sec_filings, insider, analyst, social, options]
+    time_decay_halflife_days: 7
   risk:
     var_confidence: 0.95
     lookback_days: 252
+    factor_model: fama_french_4
+    rolling_windows: [30, 60, 90]
+    stress_scenarios: [financial_crisis_2008, covid_2020, rate_shock_2022, flash_crash]
+    tail_risk: true
+
+  # Scoring engine settings
+  scoring:
+    regime_detection: auto       # auto, bull, bear, volatile, normal
+    confidence_weighting: true
+    signal_interactions: true
+    conviction_grading: true
+
+  # Utility modules (not pipeline plugins — called on demand)
+  backtesting:
+    walk_forward_splits: 5
+    train_ratio: 0.7
+    commission_bps: 10
+    signal_functions: [rsi, ma_crossover, macd, bollinger, composite]
+  portfolio:
+    optimization_methods: [mean_variance, risk_parity, black_litterman, equal_risk]
+    position_sizing: [kelly, volatility, fixed_risk]
+    risk_free_rate: auto
+    max_position_pct: 0.20
+    min_position_pct: 0.02
 
 # Report settings
 reports:

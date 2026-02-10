@@ -20,7 +20,8 @@ edgartools>=2.0
 sec-edgar-downloader>=5.0
 
 # --- Technical Analysis ---
-ta>=0.11
+TA-Lib>=0.4.28        # requires TA-Lib C library: https://ta-lib.org
+ta>=0.11              # fallback if TA-Lib C lib not installed
 mplfinance>=0.12
 
 # --- Screening ---
@@ -47,6 +48,9 @@ seaborn>=0.13
 # --- Reports ---
 jinja2>=3.1
 tabulate>=0.9
+
+# --- Scientific Computing ---
+scipy>=1.11
 
 # --- Utilities ---
 requests>=2.31
