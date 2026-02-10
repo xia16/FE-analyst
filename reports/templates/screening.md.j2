@@ -2,9 +2,9 @@
 
 ## Universe Scan ({{ ctx.tickers | length }} companies)
 
-| Ticker | Company | Score | Rec | P/E (Fwd) | Margin | Rev Growth | Moat |
-|--------|---------|-------|-----|-----------|--------|-----------|------|
-{% for ticker in ctx.tickers | sort(attribute=ctx.scores.get(ticker, {}).get("composite_score", 0)) | reverse %}{% set profile = ctx.fundamentals_data.get(ticker, {}).get("profile", {}) %}{% set score = ctx.scores.get(ticker, {}) %}{% set r = ctx.fundamentals_data.get(ticker, {}).get("ratios", {}) %}{% set moat = ctx.get_analysis(ticker, "moat") or {} %}| {{ ticker }} | {{ profile.get("name", ticker)[:25] }} | **{{ score.get("composite_score", "—") }}** | {{ score.get("recommendation", "—") }} | {{ r.pe_forward | fmt_ratio }} | {{ r.profit_margin | fmt_pct }} | {{ r.revenue_growth | fmt_pct }} | {{ moat.get("composite_moat_score", "—") }} |
+| Ticker | ADR | Company | Score | Rec | P/E (Fwd) | Margin | Rev Growth | Moat |
+|--------|-----|---------|-------|-----|-----------|--------|-----------|------|
+{% for ticker in ctx.tickers | sort(attribute=ctx.scores.get(ticker, {}).get("composite_score", 0)) | reverse %}{% set profile = ctx.fundamentals_data.get(ticker, {}).get("profile", {}) %}{% set score = ctx.scores.get(ticker, {}) %}{% set r = ctx.fundamentals_data.get(ticker, {}).get("ratios", {}) %}{% set moat = ctx.get_analysis(ticker, "moat") or {} %}| {{ ticker }} | {{ profile.get("adr", "") }} | {{ profile.get("name", ticker)[:25] }} | **{{ score.get("composite_score", "—") }}** | {{ score.get("recommendation", "—") }} | {{ r.pe_forward | fmt_ratio }} | {{ r.profit_margin | fmt_pct }} | {{ r.revenue_growth | fmt_pct }} | {{ moat.get("composite_moat_score", "—") }} |
 {% endfor %}
 
 ## Top Picks
