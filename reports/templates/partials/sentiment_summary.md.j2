@@ -1,49 +1,55 @@
-## Sentiment Analysis
+## Sentiment Data
 
-**Overall: {{ sent.overall_label }}** (Score: {{ sent.overall_score }}) | Confidence: {{ sent.confidence | default("N/A") }}
-
-{% if sent.reasoning %}
-> {{ sent.reasoning }}
-{% endif %}
+**Heuristic Baseline: {{ sent.overall_label }}** ({{ sent.overall_score }})
 
 {% if sent.source_counts %}
-| Source | Items Analyzed |
-|--------|---------------|
-| News Articles | {{ sent.source_counts.news_articles | default(0) }} |
-| Reddit Posts | {{ sent.source_counts.reddit_posts | default(0) }} |
-| Analyst Recommendations | {{ sent.source_counts.analyst_recommendations | default(0) }} |
-| Insider Transactions | {{ sent.source_counts.insider_trades | default(0) }} |
-{% endif %}
-
-{% if sent.news_sentiment %}
-### News Sentiment: {{ sent.news_sentiment.label | default("N/A") }} ({{ sent.news_sentiment.score | default(0) }})
-{% if sent.news_sentiment.key_themes %}
-- **Key themes:** {{ sent.news_sentiment.key_themes | join(", ") }}
-{% endif %}
-{% if sent.news_sentiment.notable_headlines %}
-{% for headline in sent.news_sentiment.notable_headlines %}
-- {{ headline }}
+| Source | Count |
+|--------|-------|
+{% for source, count in sent.source_counts.items() %}| {{ source | replace("_"," ") | title }} | {{ count }} |
 {% endfor %}
 {% endif %}
+
+{% if sent.raw_data %}
+{% set rd = sent.raw_data %}
+
+{% if rd.news %}
+### Recent News ({{ rd.news | length }} articles)
+{% for article in rd.news[:15] %}
+- **[{{ article.source | default("") }}]** {{ article.headline | default("") }}{% if article.summary %} — {{ article.summary[:150] }}{% endif %}
+
+{% endfor %}
 {% endif %}
 
-{% if sent.analyst_sentiment %}
-### Analyst Consensus: {{ sent.analyst_sentiment.consensus | default("N/A") }} ({{ sent.analyst_sentiment.label | default("N/A") }})
-{% if sent.analyst_sentiment.recent_changes %}
-- {{ sent.analyst_sentiment.recent_changes }}
-{% endif %}
-{% endif %}
-
-{% if sent.social_sentiment and sent.social_sentiment.label != "NO DATA" %}
-### Social Sentiment: {{ sent.social_sentiment.label | default("N/A") }} ({{ sent.social_sentiment.score | default(0) }})
-{% if sent.social_sentiment.summary %}
-- {{ sent.social_sentiment.summary }}
-{% endif %}
+{% if rd.analyst_recommendations %}
+### Analyst Recommendations
+| Firm | Action | To Grade | From Grade |
+|------|--------|----------|------------|
+{% for rec in rd.analyst_recommendations %}| {{ rec.get("Firm", rec.get("firm", "")) }} | {{ rec.get("Action", rec.get("action", "")) }} | {{ rec.get("To Grade", rec.get("toGrade", "")) }} | {{ rec.get("From Grade", rec.get("fromGrade", "")) }} |
+{% endfor %}
 {% endif %}
 
-{% if sent.insider_sentiment and sent.insider_sentiment.label != "NO DATA" %}
-### Insider Activity: {{ sent.insider_sentiment.label | default("N/A") }} ({{ sent.insider_sentiment.score | default(0) }})
-{% if sent.insider_sentiment.summary %}
-- {{ sent.insider_sentiment.summary }}
+{% if rd.reddit_posts %}
+### Reddit Discussions ({{ rd.reddit_posts | length }} posts)
+| Subreddit | Title | Score | Comments | Upvote % |
+|-----------|-------|-------|----------|----------|
+{% for post in rd.reddit_posts[:15] %}| r/{{ post.subreddit | default("?") }} | {{ post.title | default("") | truncate(60) }} | {{ post.score | default(0) }} | {{ post.num_comments | default(0) }} | {{ "%.0f" | format((post.upvote_ratio | default(0)) * 100) }}% |
+{% endfor %}
 {% endif %}
+
+{% if rd.insider_trades %}
+### Insider Transactions
+| Name | Type | Shares | Change | Date |
+|------|------|--------|--------|------|
+{% for t in rd.insider_trades[:10] %}| {{ t.name | default("") }} | {{ t.transactionType | default("") }} | {{ t.share | default(0) | int }} | {{ t.change | default(0) | int }} | {{ t.transactionDate | default("") }} |
+{% endfor %}
+{% endif %}
+
+{% if rd.institutional_holders %}
+### Top Institutional Holders
+| Holder | Shares | Value | % Out |
+|--------|--------|-------|-------|
+{% for h in rd.institutional_holders %}| {{ h.get("Holder", "") }} | {{ h.get("Shares", 0) | int }} | {{ h.get("Value", 0) | int }} | {{ h.get("pctHeld", h.get("% Out", "")) }} |
+{% endfor %}
+{% endif %}
+
 {% endif %}

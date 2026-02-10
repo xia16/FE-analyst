@@ -31,8 +31,7 @@ fredapi>=0.5
 wbdata>=1.0
 pandas-datareader>=0.10
 
-# --- News & Sentiment (LLM-based) ---
-anthropic>=0.39
+# --- News & Sentiment (data gathering) ---
 
 # --- Alternative Data ---
 praw>=7.7

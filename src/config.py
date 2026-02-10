@@ -24,7 +24,6 @@ SETTINGS = load_settings()
 
 # --- API Keys ---
 class Keys:
-    ANTHROPIC = os.getenv("ANTHROPIC_API_KEY", "")
     FINNHUB = os.getenv("FINNHUB_API_KEY", "")
     FRED = os.getenv("FRED_API_KEY", "")
     SIMFIN = os.getenv("SIMFIN_API_KEY", "")
