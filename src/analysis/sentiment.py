@@ -1,39 +1,59 @@
-"""LLM-powered sentiment analysis aggregator.
+"""Sentiment data collector and aggregator.
 
 Gathers raw data from news, Reddit, analyst recommendations, and insider
-trades, then passes everything to Claude for holistic sentiment analysis.
+trades into a structured format. Sentiment interpretation is performed
+by the analyst (Claude) when reading the output — no NLP model or API
+call is needed.
+
+The data collector scores a simple heuristic baseline (analyst consensus
++ insider net buy/sell) for the pipeline composite, but the real analysis
+happens when Claude reads the raw data during report generation.
 """
 
 from src.data_sources.news_sentiment import NewsSentimentClient
 from src.data_sources.alternative_data import AlternativeDataClient
-from src.data_sources.llm_sentiment import LLMSentimentClient
 from src.utils.logger import setup_logger
 
 logger = setup_logger("sentiment_analysis")
 
 
 class SentimentAnalyzer:
-    """Gather multi-source data and analyze sentiment via LLM."""
+    """Gather multi-source sentiment data for analyst interpretation."""
 
     def __init__(self):
         self.news_client = NewsSentimentClient()
         self.alt_client = AlternativeDataClient()
-        self.llm_client = LLMSentimentClient()
 
     def analyze(self, ticker: str) -> dict:
-        """Gather all data sources and run LLM sentiment analysis."""
+        """Gather all sentiment data sources into a structured result.
+
+        Returns a dict with raw data from each source, plus a simple
+        heuristic score for the pipeline composite. The raw data is
+        designed to be read and interpreted by Claude during analysis.
+        """
         logger.info("Gathering sentiment data for %s", ticker)
 
         # 1. Fetch news headlines
-        news = self.news_client.get_company_news(ticker)
+        news = []
+        try:
+            news = self.news_client.get_company_news(ticker)
+        except Exception as e:
+            logger.warning("  News fetch failed: %s", e)
         logger.info("  News articles: %d", len(news))
 
-        # 2. Fetch Reddit posts
+        # 2. Fetch Reddit posts from multiple subreddits
         reddit_posts = []
-        try:
-            reddit_posts = self.alt_client.get_reddit_sentiment(ticker)
-        except Exception as e:
-            logger.warning("  Reddit fetch failed: %s", e)
+        subreddits = ["wallstreetbets", "stocks", "investing"]
+        for sub in subreddits:
+            try:
+                posts = self.alt_client.get_reddit_sentiment(
+                    ticker, subreddit=sub, limit=20
+                )
+                for p in posts:
+                    p["subreddit"] = sub
+                reddit_posts.extend(posts)
+            except Exception as e:
+                logger.warning("  Reddit r/%s fetch failed: %s", sub, e)
         logger.info("  Reddit posts: %d", len(reddit_posts))
 
         # 3. Fetch analyst recommendations
@@ -54,24 +74,92 @@ class SentimentAnalyzer:
             logger.warning("  Insider trades fetch failed: %s", e)
         logger.info("  Insider trades: %d", len(insider_trades))
 
-        # 5. Send everything to LLM for analysis
-        result = self.llm_client.analyze(
-            ticker=ticker,
-            news=news,
-            reddit_posts=reddit_posts,
-            analyst_recs=analyst_recs,
-            insider_trades=insider_trades,
-        )
+        # 5. Fetch institutional ownership
+        institutional = []
+        try:
+            inst_df = self.alt_client.get_institutional_ownership(ticker)
+            if inst_df is not None and not inst_df.empty:
+                institutional = inst_df.iloc[:10].to_dict("records")
+        except Exception as e:
+            logger.warning("  Institutional ownership fetch failed: %s", e)
+        logger.info("  Institutional holders: %d", len(institutional))
 
-        # Attach raw source counts for transparency
-        result["source_counts"] = {
-            "news_articles": len(news),
-            "reddit_posts": len(reddit_posts),
-            "analyst_recommendations": len(analyst_recs),
-            "insider_trades": len(insider_trades),
+        # Build heuristic score for pipeline composite
+        heuristic_score = self._compute_heuristic(analyst_recs, insider_trades)
+
+        return {
+            "ticker": ticker,
+            "overall_score": heuristic_score,
+            "overall_label": self._label_from_score(heuristic_score),
+            # Raw data for Claude to interpret
+            "raw_data": {
+                "news": news[:30],  # cap to keep context manageable
+                "reddit_posts": reddit_posts[:30],
+                "analyst_recommendations": analyst_recs,
+                "insider_trades": insider_trades[:20],
+                "institutional_holders": institutional,
+            },
+            "source_counts": {
+                "news_articles": len(news),
+                "reddit_posts": len(reddit_posts),
+                "analyst_recommendations": len(analyst_recs),
+                "insider_trades": len(insider_trades),
+                "institutional_holders": len(institutional),
+            },
         }
 
-        return result
+    @staticmethod
+    def _compute_heuristic(analyst_recs: list[dict], insider_trades: list[dict]) -> float:
+        """Simple heuristic score from analyst consensus + insider activity.
+
+        This provides a baseline for the pipeline composite score. The
+        real sentiment analysis happens when Claude reads the raw data.
+
+        Returns float from -1.0 to 1.0.
+        """
+        scores = []
+
+        # Analyst consensus heuristic
+        if analyst_recs:
+            grade_map = {
+                "Strong Buy": 1.0, "Buy": 0.5, "Overweight": 0.4,
+                "Outperform": 0.4, "Market Outperform": 0.3,
+                "Hold": 0.0, "Neutral": 0.0, "Equal-Weight": 0.0,
+                "Market Perform": 0.0, "Sector Perform": 0.0,
+                "Underweight": -0.3, "Underperform": -0.4,
+                "Sell": -0.5, "Strong Sell": -1.0, "Reduce": -0.4,
+            }
+            grades = []
+            for rec in analyst_recs:
+                grade = rec.get("To Grade", rec.get("toGrade", ""))
+                if grade in grade_map:
+                    grades.append(grade_map[grade])
+            if grades:
+                scores.append(sum(grades) / len(grades))
+
+        # Insider trade heuristic (net buy = bullish, net sell = bearish)
+        if insider_trades:
+            net_change = sum(t.get("change", 0) for t in insider_trades[:20])
+            if net_change > 0:
+                scores.append(0.3)
+            elif net_change < 0:
+                scores.append(-0.2)
+            else:
+                scores.append(0.0)
+
+        if scores:
+            return round(sum(scores) / len(scores), 3)
+        return 0.0
+
+    @staticmethod
+    def _label_from_score(score: float) -> str:
+        if score > 0.2:
+            return "BULLISH"
+        elif score < -0.2:
+            return "BEARISH"
+        elif score == 0.0:
+            return "NO DATA"
+        return "NEUTRAL"
 
 
 # --- Plugin adapter for pipeline ---
