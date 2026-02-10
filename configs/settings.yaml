@@ -63,7 +63,7 @@ analysis:
       module: src.analysis.sentiment
       class: SentimentAnalyzerPlugin
       weight: 0.10
-      enabled: false  # disable by default (requires FinBERT download)
+      enabled: true  # LLM-based; requires ANTHROPIC_API_KEY in .env
     moat:
       module: src.analysis.moat
       class: MoatAnalyzerPlugin
@@ -81,8 +81,8 @@ analysis:
     risk_free_rate: auto
     market_premium: 0.06
   sentiment:
-    model: ProsusAI/finbert
-    batch_size: 16
+    model: claude-sonnet-4-5-20250929
+    sources: [news, reddit, analysts, insider_trades]
   risk:
     var_confidence: 0.95
     lookback_days: 252

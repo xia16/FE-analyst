@@ -1,6 +1,7 @@
-"""News and sentiment data client.
+"""News data client.
 
-Primary: Finnhub news | Sentiment: FinBERT (local model)
+Primary: Finnhub news API.
+Sentiment analysis is handled by LLM (see llm_sentiment.py).
 """
 
 import pandas as pd
@@ -14,7 +15,7 @@ cache = DataCache("news")
 
 
 class NewsSentimentClient:
-    """Fetch financial news and compute sentiment scores."""
+    """Fetch financial news articles for sentiment analysis."""
 
     def get_company_news(
         self, ticker: str, date_from: str = "", date_to: str = ""
@@ -57,40 +58,9 @@ class NewsSentimentClient:
         client = finnhub.Client(api_key=Keys.FINNHUB)
         return client.general_news(category, min_id=0)
 
-    def analyze_sentiment(self, texts: list[str]) -> list[dict]:
-        """Run FinBERT sentiment analysis on a list of texts.
-
-        Returns list of {text, label, score} where label is
-        positive/negative/neutral.
-        """
-        from transformers import pipeline
-
-        logger.info("Running FinBERT on %d texts", len(texts))
-        classifier = pipeline(
-            "sentiment-analysis",
-            model="ProsusAI/finbert",
-            truncation=True,
-            max_length=512,
-        )
-
-        results = classifier(texts)
-        return [
-            {"text": text[:100], "label": r["label"], "score": round(r["score"], 4)}
-            for text, r in zip(texts, results)
-        ]
-
     def get_news_with_sentiment(self, ticker: str) -> pd.DataFrame:
-        """Fetch news and attach sentiment scores."""
+        """Fetch news articles. Sentiment scoring is handled by LLM analyzer."""
         news = self.get_company_news(ticker)
         if not news:
             return pd.DataFrame()
-
-        headlines = [n["headline"] for n in news if n.get("headline")]
-        sentiments = self.analyze_sentiment(headlines)
-
-        df = pd.DataFrame(news)
-        if sentiments:
-            sent_df = pd.DataFrame(sentiments)
-            df["sentiment_label"] = sent_df["label"].values[: len(df)]
-            df["sentiment_score"] = sent_df["score"].values[: len(df)]
-        return df
+        return pd.DataFrame(news)

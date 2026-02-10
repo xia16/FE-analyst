@@ -1,15 +1,49 @@
-## Sentiment
+## Sentiment Analysis
 
-**Overall: {{ sent.overall_label }}** (Score: {{ sent.overall_score }})
+**Overall: {{ sent.overall_label }}** (Score: {{ sent.overall_score }}) | Confidence: {{ sent.confidence | default("N/A") }}
 
-{% if sent.sources %}
-{% for source, data in sent.sources.items() %}
-### {{ source | title }}
-{% if source == "news" %}
-- Positive: {{ data.positive_pct }}% | Negative: {{ data.negative_pct }}% | Neutral: {{ data.neutral_pct }}%
-- Articles analyzed: {{ data.article_count }}
-{% elif source == "reddit" %}
-- Posts: {{ data.post_count }} | Avg Score: {{ data.avg_score }} | Avg Upvote: {{ data.avg_upvote_ratio }}
+{% if sent.reasoning %}
+> {{ sent.reasoning }}
 {% endif %}
+
+{% if sent.source_counts %}
+| Source | Items Analyzed |
+|--------|---------------|
+| News Articles | {{ sent.source_counts.news_articles | default(0) }} |
+| Reddit Posts | {{ sent.source_counts.reddit_posts | default(0) }} |
+| Analyst Recommendations | {{ sent.source_counts.analyst_recommendations | default(0) }} |
+| Insider Transactions | {{ sent.source_counts.insider_trades | default(0) }} |
+{% endif %}
+
+{% if sent.news_sentiment %}
+### News Sentiment: {{ sent.news_sentiment.label | default("N/A") }} ({{ sent.news_sentiment.score | default(0) }})
+{% if sent.news_sentiment.key_themes %}
+- **Key themes:** {{ sent.news_sentiment.key_themes | join(", ") }}
+{% endif %}
+{% if sent.news_sentiment.notable_headlines %}
+{% for headline in sent.news_sentiment.notable_headlines %}
+- {{ headline }}
 {% endfor %}
+{% endif %}
+{% endif %}
+
+{% if sent.analyst_sentiment %}
+### Analyst Consensus: {{ sent.analyst_sentiment.consensus | default("N/A") }} ({{ sent.analyst_sentiment.label | default("N/A") }})
+{% if sent.analyst_sentiment.recent_changes %}
+- {{ sent.analyst_sentiment.recent_changes }}
+{% endif %}
+{% endif %}
+
+{% if sent.social_sentiment and sent.social_sentiment.label != "NO DATA" %}
+### Social Sentiment: {{ sent.social_sentiment.label | default("N/A") }} ({{ sent.social_sentiment.score | default(0) }})
+{% if sent.social_sentiment.summary %}
+- {{ sent.social_sentiment.summary }}
+{% endif %}
+{% endif %}
+
+{% if sent.insider_sentiment and sent.insider_sentiment.label != "NO DATA" %}
+### Insider Activity: {{ sent.insider_sentiment.label | default("N/A") }} ({{ sent.insider_sentiment.score | default(0) }})
+{% if sent.insider_sentiment.summary %}
+- {{ sent.insider_sentiment.summary }}
+{% endif %}
 {% endif %}
