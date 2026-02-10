@@ -8,44 +8,79 @@ default:
   - SNPS
   - CDNS
 
+# =====================================================
+# Japan-focused watchlists
+# =====================================================
+
 japan_champions:
   - 8035.T     # Tokyo Electron
   - 6920.T     # Lasertec
   - 6857.T     # Advantest
   - 4063.T     # Shin-Etsu
+  - 7741.T     # Hoya Corp
   - 2801.T     # Ajinomoto
   - 6981.T     # Murata
-  - 7741.T     # Hamamatsu
+  - 6965.T     # Hamamatsu
   - 6146.T     # Disco
+
+# USD-accessible Japanese moat companies via ADR/OTC
+# Key framework: Equipment + Chemicals + Power Infrastructure
+japan_adr_moats:
+  - TOELY      # Tokyo Electron — Coater/Developer Monopoly
+  - SHECY      # Shin-Etsu Chemical — Silicon Wafers Leader
+  - ATEYY      # Advantest — GPU/AI Chip Testing Duopoly
+  - DSCSY      # Disco Corp — HBM Memory Cutting (70-80%+)
+  - HOCPY      # Hoya Corp — EUV Mask Blanks Dominance
+  - LSRCY      # Lasertec — EUV Inspection Monopoly
+  - HTHIY      # Hitachi — Power Grid/Transformers
+  - SHWDY      # Resonac — AI Chip Packaging Materials
+  - IBIDF      # Ibiden — IC Packaging Substrates
+  - MHVYF      # Mitsubishi Heavy Industries — Gas Turbines/Power Gen
+  - SMTOY      # Sumitomo Electric — HV Power Cables/GaN/SiC
+
+# =====================================================
+# Supply chain segment watchlists
+# =====================================================
 
 euv_chain:
   - ASML
-  - 6920.T
-  - 4063.T
-  - 4185.T
-  - 4186.T
+  - 6920.T     # Lasertec
+  - 4063.T     # Shin-Etsu
+  - 7741.T     # Hoya Corp (mask blanks)
+  - 4185.T     # JSR
+  - 4186.T     # TOK
 
 hbm_players:
-  - 000660.KS
-  - MU
-  - TSM
+  - 000660.KS  # SK Hynix
+  - MU         # Micron
+  - TSM        # TSMC (CoWoS packaging)
+  - 6146.T     # Disco (dicing/grinding for HBM stacking)
 
 packaging:
   - 2801.T     # Ajinomoto (ABF film)
   - 4062.T     # Ibiden
   - 6967.T     # Shinko Electric
+  - 4004.T     # Resonac (packaging materials)
 
 semicon_equipment:
   - ASML
-  - 8035.T
+  - 8035.T     # Tokyo Electron
   - LRCX
   - AMAT
   - KLAC
-  - 6857.T
-  - 6920.T
-  - 6146.T
+  - 6857.T     # Advantest
+  - 6920.T     # Lasertec
+  - 6146.T     # Disco
 
 eda_design:
   - SNPS
   - CDNS
   - ARM
+
+# AI Power & Energy Infrastructure
+ai_power_infra:
+  - 6501.T     # Hitachi — power grids, transformers
+  - 7011.T     # Mitsubishi Heavy Industries — gas turbines, power gen
+  - 5802.T     # Sumitomo Electric — HV cables, GaN/SiC
+  - VRT        # Vertiv — data center thermal management
+  - MPWR       # Monolithic Power — GPU power delivery ICs

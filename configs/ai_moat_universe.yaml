@@ -8,21 +8,31 @@
 #   technology_lockin: proprietary IP/tech
 #   supply_chain_criticality: bottleneck severity
 #   barriers_to_entry: capital/knowledge/regulatory barriers
+#
+# Choke-point tiers (new framework):
+#   tier_1: True monopoly or near-monopoly (>80% share, no viable alternative)
+#   tier_2: Duopoly or dominant position (50-80% share, 1-2 alternatives)
+#   tier_3: Oligopoly leader (30-50% share, multiple competitors)
+#
+# USD access: adr field indicates ADR/OTC ticker for USD-denominated trading
 # ============================================================
 
 categories:
 
   # =====================================================
-  # 1. SEMICONDUCTOR EQUIPMENT (Japan dominance)
+  # 1. SEMICONDUCTOR EQUIPMENT — "The Picks & Shovels"
+  # Near-monopolies in specific steps of manufacturing AI chips
   # =====================================================
   semiconductor_equipment:
-    description: "Machines that manufacture AI chips"
+    description: "Machines that manufacture AI chips — near-monopolies in specific fabrication steps"
+    choke_point_theme: "picks_and_shovels"
     companies:
       - ticker: "8035.T"
         name: "Tokyo Electron"
         adr: "TOELY"
         country: JP
-        moat: "Coater/developer, etch, deposition tools. #3 global semicon equipment"
+        choke_point_tier: tier_2
+        moat: "Coater/developer near-monopoly (close to 100% share in some segments) essential for EUV lithography. #3 global semicon equipment maker"
         ai_exposure_pct: 45
         market_dominance: 85
         switching_costs: 90
@@ -32,8 +42,10 @@ categories:
 
       - ticker: "6920.T"
         name: "Lasertec"
+        adr: "LSRCY"
         country: JP
-        moat: "ONLY company making EUV mask inspection tools. 100% monopoly"
+        choke_point_tier: tier_1
+        moat: "The ONLY company in the world making EUV mask blank inspection tools. True monopoly — without Lasertec, no advanced AI chip can be validated"
         ai_exposure_pct: 70
         market_dominance: 100
         switching_costs: 100
@@ -45,7 +57,8 @@ categories:
         name: "Advantest"
         adr: "ATEYY"
         country: JP
-        moat: "ATE (chip testing). #1 global with ~50% market share in SoC testers"
+        choke_point_tier: tier_2
+        moat: "Global duopoly with Teradyne in semiconductor testing. ~50% SoC tester share. As AI chips grow more complex, testing intensity increases directly benefiting Advantest"
         ai_exposure_pct: 55
         market_dominance: 85
         switching_costs: 85
@@ -55,8 +68,10 @@ categories:
 
       - ticker: "6146.T"
         name: "Disco Corporation"
+        adr: "DSCSY"
         country: JP
-        moat: "Dicing/grinding machines. ~80% global share in wafer dicing"
+        choke_point_tier: tier_1
+        moat: "The 'King of Cutting' — 70-80%+ global share in precision dicing, grinding, and polishing. Critical for HBM (High Bandwidth Memory) stacked on AI GPUs"
         ai_exposure_pct: 40
         market_dominance: 90
         switching_costs: 85
@@ -67,6 +82,7 @@ categories:
       - ticker: "7735.T"
         name: "Screen Holdings"
         country: JP
+        choke_point_tier: tier_2
         moat: "Wafer cleaning equipment. ~50% global share"
         ai_exposure_pct: 35
         market_dominance: 80
@@ -78,7 +94,8 @@ categories:
       - ticker: "ASML"
         name: "ASML Holding"
         country: NL
-        moat: "EUV lithography monopoly. Literally only supplier on earth"
+        choke_point_tier: tier_1
+        moat: "EUV lithography monopoly. Literally the only supplier on earth. No ASML = no advanced AI chips"
         ai_exposure_pct: 50
         market_dominance: 100
         switching_costs: 100
@@ -89,6 +106,7 @@ categories:
       - ticker: "LRCX"
         name: "Lam Research"
         country: US
+        choke_point_tier: tier_2
         moat: "Etch & deposition equipment. ~45% etch market share"
         ai_exposure_pct: 40
         market_dominance: 80
@@ -100,6 +118,7 @@ categories:
       - ticker: "AMAT"
         name: "Applied Materials"
         country: US
+        choke_point_tier: tier_3
         moat: "Largest semicon equipment company. Deposition, etch, CMP"
         ai_exposure_pct: 35
         market_dominance: 75
@@ -111,6 +130,7 @@ categories:
       - ticker: "KLAC"
         name: "KLA Corporation"
         country: US
+        choke_point_tier: tier_2
         moat: "Process control & inspection. ~55% market share"
         ai_exposure_pct: 40
         market_dominance: 85
@@ -120,16 +140,20 @@ categories:
         barriers_to_entry: 85
 
   # =====================================================
-  # 2. SPECIALTY CHEMICALS & MATERIALS
+  # 2. SPECIALTY CHEMICALS & MATERIALS — "The Hidden Monopolies"
+  # Japanese chemical firms controlling 60-90% of niche materials
+  # required to make chips function
   # =====================================================
   chemicals_materials:
-    description: "Essential chemicals and materials for chip fabrication"
+    description: "Essential chemicals and materials for chip fabrication — hidden monopolies controlling 60-90% of niche markets"
+    choke_point_theme: "hidden_monopolies"
     companies:
       - ticker: "4063.T"
         name: "Shin-Etsu Chemical"
         adr: "SHECY"
         country: JP
-        moat: "World #1 silicon wafers (~30% share) + #1 photoresists. Irreplaceable"
+        choke_point_tier: tier_1
+        moat: "World's #1 silicon wafer manufacturer (~30% share) — the canvas chips are printed on. Massive economies of scale, fortress balance sheet (huge cash reserves). Classic 'Value + Moat' play"
         ai_exposure_pct: 50
         market_dominance: 90
         switching_costs: 90
@@ -140,6 +164,7 @@ categories:
       - ticker: "3436.T"
         name: "SUMCO"
         country: JP
+        choke_point_tier: tier_2
         moat: "#2 silicon wafer manufacturer globally (~25% share)"
         ai_exposure_pct: 45
         market_dominance: 80
@@ -148,9 +173,23 @@ categories:
         supply_chain_criticality: 85
         barriers_to_entry: 85
 
+      - ticker: "7741.T"
+        name: "Hoya Corporation"
+        adr: "HOCPY"
+        country: JP
+        choke_point_tier: tier_1
+        moat: "Dominates EUV mask blanks market. Without Hoya's glass technology, advanced manufacturing at TSMC would halt. Also a leader in optical components"
+        ai_exposure_pct: 45
+        market_dominance: 90
+        switching_costs: 95
+        technology_lockin: 90
+        supply_chain_criticality: 95
+        barriers_to_entry: 90
+
       - ticker: "4185.T"
         name: "JSR Corporation"
         country: JP
+        choke_point_tier: tier_2
         moat: "EUV photoresists leader. ~30% global photoresist share"
         ai_exposure_pct: 55
         market_dominance: 85
@@ -162,6 +201,7 @@ categories:
       - ticker: "4186.T"
         name: "Tokyo Ohka Kogyo (TOK)"
         country: JP
+        choke_point_tier: tier_3
         moat: "EUV/ArF photoresists. Top 3 globally"
         ai_exposure_pct: 50
         market_dominance: 75
@@ -174,6 +214,7 @@ categories:
         name: "Fujifilm Holdings"
         adr: "FUJIY"
         country: JP
+        choke_point_tier: tier_3
         moat: "Advanced semiconductor materials, CMP slurries, photoresists"
         ai_exposure_pct: 20
         market_dominance: 70
@@ -184,8 +225,10 @@ categories:
 
       - ticker: "4004.T"
         name: "Resonac (Showa Denko)"
+        adr: "SHWDY"
         country: JP
-        moat: "SiC epitaxial wafers, specialty gases, CMP slurries, encapsulants"
+        choke_point_tier: tier_2
+        moat: "Leader in packaging materials — films and laminates for complex AI chip packaging and 3D-stacked memory. Also SiC epitaxial wafers, specialty gases, CMP slurries"
         ai_exposure_pct: 35
         market_dominance: 70
         switching_costs: 80
@@ -196,6 +239,7 @@ categories:
       - ticker: "ENTG"
         name: "Entegris"
         country: US
+        choke_point_tier: tier_2
         moat: "Contamination control, CMP slurries (acquired CMC Materials), filters"
         ai_exposure_pct: 40
         market_dominance: 80
@@ -207,6 +251,7 @@ categories:
       - ticker: "LIN"
         name: "Linde plc"
         country: IE
+        choke_point_tier: tier_2
         moat: "Industrial gases for fab operations. #1 globally"
         ai_exposure_pct: 15
         market_dominance: 75
@@ -220,10 +265,12 @@ categories:
   # =====================================================
   packaging_substrates:
     description: "Critical for CoWoS, HBM, and AI chip packaging"
+    choke_point_theme: "packaging_bottleneck"
     companies:
       - ticker: "2801.T"
         name: "Ajinomoto"
         country: JP
+        choke_point_tier: tier_1
         moat: "ABF substrate film (Ajinomoto Build-up Film). ~100% monopoly for advanced substrates"
         ai_exposure_pct: 15
         market_dominance: 100
@@ -234,8 +281,10 @@ categories:
 
       - ticker: "4062.T"
         name: "Ibiden"
+        adr: "IBIDF"
         country: JP
-        moat: "IC package substrates (ABF substrates). Top 2 globally"
+        choke_point_tier: tier_2
+        moat: "World leader in IC packaging substrates. Primary supplier to Intel and NVIDIA for high-performance substrates that AI processors sit on"
         ai_exposure_pct: 50
         market_dominance: 80
         switching_costs: 85
@@ -246,6 +295,7 @@ categories:
       - ticker: "6967.T"
         name: "Shinko Electric Industries"
         country: JP
+        choke_point_tier: tier_3
         moat: "FC-BGA substrates for high-end processors. Top 3 globally"
         ai_exposure_pct: 55
         market_dominance: 75
@@ -257,6 +307,7 @@ categories:
       - ticker: "3037.TW"
         name: "Unimicron Technology"
         country: TW
+        choke_point_tier: tier_3
         moat: "ABF substrates and HDI PCBs. #1 PCB maker globally"
         ai_exposure_pct: 40
         market_dominance: 75
@@ -270,11 +321,13 @@ categories:
   # =====================================================
   electronic_components:
     description: "Components essential for AI server infrastructure"
+    choke_point_theme: "server_components"
     companies:
       - ticker: "6981.T"
         name: "Murata Manufacturing"
         adr: "MRAAY"
         country: JP
+        choke_point_tier: tier_2
         moat: "MLCCs (ceramic capacitors). ~40% global share. Every AI chip needs them"
         ai_exposure_pct: 25
         market_dominance: 85
@@ -287,6 +340,7 @@ categories:
         name: "TDK Corporation"
         adr: "TTDKY"
         country: JP
+        choke_point_tier: tier_3
         moat: "MLCCs, inductors, sensors. #2 passive components"
         ai_exposure_pct: 20
         market_dominance: 70
@@ -299,6 +353,7 @@ categories:
         name: "Nidec Corporation"
         adr: "NJDCY"
         country: JP
+        choke_point_tier: tier_2
         moat: "#1 precision motors globally. Critical for cooling (liquid cooling for AI servers)"
         ai_exposure_pct: 15
         market_dominance: 75
@@ -307,9 +362,10 @@ categories:
         supply_chain_criticality: 65
         barriers_to_entry: 70
 
-      - ticker: "7741.T"
+      - ticker: "6965.T"
         name: "Hamamatsu Photonics"
         country: JP
+        choke_point_tier: tier_1
         moat: "Photon sensors, image sensors. ~90% market share in photomultiplier tubes"
         ai_exposure_pct: 20
         market_dominance: 90
@@ -323,10 +379,12 @@ categories:
   # =====================================================
   eda_design:
     description: "Software and IP without which no AI chip can be designed"
+    choke_point_theme: "design_lock_in"
     companies:
       - ticker: "SNPS"
         name: "Synopsys"
         country: US
+        choke_point_tier: tier_2
         moat: "EDA tools duopoly. ~33% market share. Every chip designed with their tools"
         ai_exposure_pct: 60
         market_dominance: 85
@@ -338,6 +396,7 @@ categories:
       - ticker: "CDNS"
         name: "Cadence Design Systems"
         country: US
+        choke_point_tier: tier_2
         moat: "EDA tools duopoly. ~32% market share"
         ai_exposure_pct: 55
         market_dominance: 85
@@ -349,6 +408,7 @@ categories:
       - ticker: "ARM"
         name: "ARM Holdings"
         country: GB
+        choke_point_tier: tier_1
         moat: "CPU architecture IP. 99% of mobile, growing in AI inference"
         ai_exposure_pct: 30
         market_dominance: 90
@@ -362,10 +422,12 @@ categories:
   # =====================================================
   networking:
     description: "Connectivity fabric for AI training clusters"
+    choke_point_theme: "data_center_fabric"
     companies:
       - ticker: "AVGO"
         name: "Broadcom"
         country: US
+        choke_point_tier: tier_2
         moat: "Networking ASICs, custom AI chips (Google TPU), Tomahawk switches"
         ai_exposure_pct: 35
         market_dominance: 80
@@ -377,6 +439,7 @@ categories:
       - ticker: "ANET"
         name: "Arista Networks"
         country: US
+        choke_point_tier: tier_2
         moat: "AI data center networking. ~70% of cloud titan switching"
         ai_exposure_pct: 50
         market_dominance: 75
@@ -388,6 +451,7 @@ categories:
       - ticker: "APH"
         name: "Amphenol"
         country: US
+        choke_point_tier: tier_3
         moat: "High-speed connectors/cables. #2 globally. Essential for GPU interconnect"
         ai_exposure_pct: 25
         market_dominance: 70
@@ -397,14 +461,57 @@ categories:
         barriers_to_entry: 65
 
   # =====================================================
-  # 7. POWER & COOLING (AI infra bottleneck)
+  # 7. POWER & ENERGY INFRASTRUCTURE — "AI Energy Grid"
+  # AI data centers causing massive spike in power demand.
+  # These companies build the heavy infrastructure.
   # =====================================================
-  power_cooling:
-    description: "Power delivery and thermal management for AI data centers"
+  power_energy_infrastructure:
+    description: "Power generation, transmission, and delivery infrastructure for AI data centers — the energy grid bottleneck"
+    choke_point_theme: "ai_energy_grid"
     companies:
+      - ticker: "6501.T"
+        name: "Hitachi"
+        adr: "HTHIY"
+        country: JP
+        choke_point_tier: tier_2
+        moat: "Global leader in power grids (transformers, high-voltage transmission) after massive restructuring. Key supplier for hooking up hyperscale data centers to the grid"
+        ai_exposure_pct: 25
+        market_dominance: 80
+        switching_costs: 85
+        technology_lockin: 75
+        supply_chain_criticality: 85
+        barriers_to_entry: 85
+
+      - ticker: "7011.T"
+        name: "Mitsubishi Heavy Industries"
+        adr: "MHVYF"
+        country: JP
+        choke_point_tier: tier_2
+        moat: "Leader in power generation equipment — gas turbines for steady-state data center power, next-gen cooling systems for industrial plants, and nuclear energy components"
+        ai_exposure_pct: 20
+        market_dominance: 75
+        switching_costs: 85
+        technology_lockin: 80
+        supply_chain_criticality: 80
+        barriers_to_entry: 90
+
+      - ticker: "5802.T"
+        name: "Sumitomo Electric Industries"
+        adr: "SMTOY"
+        country: JP
+        choke_point_tier: tier_2
+        moat: "Top global supplier of high-voltage power cables and compound semiconductors (GaN/SiC) for power efficiency in electrical infrastructure"
+        ai_exposure_pct: 20
+        market_dominance: 75
+        switching_costs: 80
+        technology_lockin: 75
+        supply_chain_criticality: 80
+        barriers_to_entry: 80
+
       - ticker: "VRT"
         name: "Vertiv Holdings"
         country: US
+        choke_point_tier: tier_2
         moat: "Data center power/cooling. #1 in thermal management for data centers"
         ai_exposure_pct: 45
         market_dominance: 70
@@ -416,6 +523,7 @@ categories:
       - ticker: "MPWR"
         name: "Monolithic Power Systems"
         country: US
+        choke_point_tier: tier_3
         moat: "Power management ICs. Key supplier for AI GPU power delivery"
         ai_exposure_pct: 40
         market_dominance: 65
@@ -429,11 +537,13 @@ categories:
   # =====================================================
   foundry_memory:
     description: "Chip manufacturing and HBM memory"
+    choke_point_theme: "manufacturing_core"
     companies:
       - ticker: "2330.TW"
         name: "Taiwan Semiconductor (TSMC)"
         adr: "TSM"
         country: TW
+        choke_point_tier: tier_1
         moat: "Only foundry capable of cutting-edge AI chips. ~90% advanced node share"
         ai_exposure_pct: 50
         market_dominance: 95
@@ -446,6 +556,7 @@ categories:
         name: "SK Hynix"
         adr: "HXSCL"
         country: KR
+        choke_point_tier: tier_2
         moat: "HBM (High Bandwidth Memory) leader. ~50% HBM market, key NVIDIA supplier"
         ai_exposure_pct: 45
         market_dominance: 85
@@ -457,6 +568,7 @@ categories:
       - ticker: "MU"
         name: "Micron Technology"
         country: US
+        choke_point_tier: tier_3
         moat: "HBM3E memory. #3 in DRAM. Growing AI memory share"
         ai_exposure_pct: 35
         market_dominance: 70

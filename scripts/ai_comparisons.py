@@ -10,6 +10,10 @@ Usage:
     python scripts/ai_comparisons.py packaging        # Advanced packaging
     python scripts/ai_comparisons.py eda              # EDA & design IP
     python scripts/ai_comparisons.py memory           # HBM/memory
+    python scripts/ai_comparisons.py japan_adr_moats  # Japan USD-accessible moats
+    python scripts/ai_comparisons.py ai_power         # AI power infrastructure
+    python scripts/ai_comparisons.py japan_equipment  # Japan semicon equipment (ADRs)
+    python scripts/ai_comparisons.py japan_chemicals  # Japan hidden monopolies (ADRs)
     python scripts/ai_comparisons.py custom ASML TOELY LRCX AMAT KLAC
 """
 
@@ -38,9 +42,9 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 COMPARISON_GROUPS = {
     "euv": {
         "title": "EUV Lithography Supply Chain",
-        "tickers": ["ASML", "6920.T", "4063.T", "4185.T", "4186.T"],
-        "labels": ["ASML (EUV machines)", "Lasertec (EUV inspection)", "Shin-Etsu (wafers+resist)",
-                    "JSR (EUV resist)", "TOK (EUV resist)"],
+        "tickers": ["ASML", "6920.T", "7741.T", "4063.T", "4185.T", "4186.T"],
+        "labels": ["ASML (EUV machines)", "Lasertec (EUV inspection)", "Hoya Corp (EUV mask blanks)",
+                    "Shin-Etsu (wafers+resist)", "JSR (EUV resist)", "TOK (EUV resist)"],
     },
     "semicon_equip": {
         "title": "Semiconductor Equipment Leaders",
@@ -74,10 +78,55 @@ COMPARISON_GROUPS = {
         "labels": ["Broadcom", "Arista Networks", "Amphenol"],
     },
     "japan_moats": {
-        "title": "Japanese AI Moat Champions",
-        "tickers": ["8035.T", "6920.T", "6857.T", "4063.T", "2801.T", "6981.T", "7741.T", "6146.T"],
+        "title": "Japanese AI Moat Champions (Local Tickers)",
+        "tickers": ["8035.T", "6920.T", "6857.T", "4063.T", "7741.T", "2801.T", "6981.T", "6965.T", "6146.T"],
         "labels": ["Tokyo Electron", "Lasertec", "Advantest", "Shin-Etsu",
-                    "Ajinomoto", "Murata", "Hamamatsu", "Disco"],
+                    "Hoya Corp", "Ajinomoto", "Murata", "Hamamatsu", "Disco"],
+    },
+    # ---- New framework: Japan ADR/OTC accessible moats ----
+    "japan_adr_moats": {
+        "title": "Japanese AI Moats — USD Accessible (ADR/OTC)",
+        "tickers": ["TOELY", "SHECY", "ATEYY", "DSCSY", "HOCPY", "LSRCY", "HTHIY"],
+        "labels": [
+            "Tokyo Electron (Coater/Dev Monopoly)",
+            "Shin-Etsu Chemical (Silicon Wafers #1)",
+            "Advantest (Chip Testing Duopoly)",
+            "Disco Corp (HBM Cutting 70-80%+)",
+            "Hoya Corp (EUV Mask Blanks)",
+            "Lasertec (EUV Inspection Monopoly)",
+            "Hitachi (Power Grid/Transformers)",
+        ],
+    },
+    "japan_equipment": {
+        "title": "Japan Semicon Equipment — 'Picks & Shovels' (ADR/OTC)",
+        "tickers": ["TOELY", "LSRCY", "ATEYY", "DSCSY"],
+        "labels": [
+            "Tokyo Electron (Coater/Developer)",
+            "Lasertec (EUV Inspection Monopoly)",
+            "Advantest (GPU/AI Chip Testing)",
+            "Disco Corp (HBM Cutting)",
+        ],
+    },
+    "japan_chemicals": {
+        "title": "Japan Hidden Monopolies — Chemicals & Materials (ADR/OTC)",
+        "tickers": ["SHECY", "HOCPY", "SHWDY", "IBIDF"],
+        "labels": [
+            "Shin-Etsu Chemical (Silicon Wafers #1)",
+            "Hoya Corp (EUV Mask Blanks)",
+            "Resonac (AI Chip Packaging Materials)",
+            "Ibiden (IC Packaging Substrates)",
+        ],
+    },
+    "ai_power": {
+        "title": "AI Energy Grid — Power Infrastructure (Japan + US)",
+        "tickers": ["HTHIY", "MHVYF", "SMTOY", "VRT", "MPWR"],
+        "labels": [
+            "Hitachi (Power Grids/Transformers)",
+            "Mitsubishi Heavy (Gas Turbines/Power Gen)",
+            "Sumitomo Electric (HV Cables/GaN/SiC)",
+            "Vertiv (Data Center Thermal Mgmt)",
+            "Monolithic Power (GPU Power Delivery)",
+        ],
     },
     "power_cooling": {
         "title": "AI Power & Cooling Infrastructure",

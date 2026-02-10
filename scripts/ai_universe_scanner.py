@@ -68,11 +68,13 @@ def parse_universe_yaml(category_filter: str = "") -> list[dict]:
             continue
 
         desc = cat_data.get("description", cat_name)
+        theme = cat_data.get("choke_point_theme", "")
 
         for item in cat_data.get("companies", []):
             if isinstance(item, dict) and "ticker" in item:
                 item["category"] = cat_name
                 item["category_desc"] = desc
+                item["choke_point_theme"] = theme
                 companies.append(item)
 
     # If no companies found, try flat list parsing
@@ -143,6 +145,8 @@ def scan_company(comp: dict) -> dict:
             "name": name,
             "country": comp.get("country", ""),
             "category": comp.get("category", ""),
+            "choke_point_tier": comp.get("choke_point_tier", ""),
+            "choke_point_theme": comp.get("choke_point_theme", ""),
             "moat": comp.get("moat", ""),
             "ai_exposure_pct": comp.get("ai_exposure_pct", 0),
             "price": current,
@@ -187,23 +191,63 @@ def generate_report(df: pd.DataFrame) -> str:
         "",
     ]
 
-    # Top 10 by moat score
+    # Choke-point tier summary
+    if "choke_point_tier" in df.columns:
+        lines.append("## Choke-Point Tier Summary")
+        lines.append("")
+        lines.append("| Tier | Definition | Companies |")
+        lines.append("|------|-----------|-----------|")
+        tier_defs = {
+            "tier_1": "True monopoly / near-monopoly (>80% share)",
+            "tier_2": "Duopoly / dominant position (50-80% share)",
+            "tier_3": "Oligopoly leader (30-50% share)",
+        }
+        for tier, definition in tier_defs.items():
+            tier_df = df[df["choke_point_tier"] == tier]
+            count = len(tier_df)
+            if count > 0:
+                names = ", ".join(tier_df["name"].tolist()[:8])
+                if count > 8:
+                    names += f" (+{count - 8} more)"
+                lines.append(f"| **{tier.replace('_', ' ').title()}** | {definition} | {names} |")
+        lines.append("")
+
+    # Top 15 by moat score
     lines.append("## Top Companies by Moat Score")
     lines.append("")
-    top = df.nlargest(15, "moat_score")[
-        ["name", "ticker", "country", "moat_score", "ai_exposure_pct",
-         "market_cap_b", "pe_forward", "revenue_growth", "perf_1y"]
-    ]
+    top_cols = ["name", "ticker", "adr", "country", "choke_point_tier", "moat_score",
+                "ai_exposure_pct", "market_cap_b", "pe_forward", "revenue_growth", "perf_1y"]
+    available_top = [c for c in top_cols if c in df.columns]
+    top = df.nlargest(15, "moat_score")[available_top]
     lines.append(top.to_markdown(index=False))
     lines.append("")
+
+    # USD-accessible (ADR) companies
+    if "adr" in df.columns:
+        adr_df = df[df["adr"].notna() & (df["adr"] != "")].sort_values("moat_score", ascending=False)
+        if not adr_df.empty:
+            lines.append("## USD-Accessible (ADR/OTC) Companies")
+            lines.append("")
+            adr_cols = ["name", "adr", "country", "choke_point_tier", "moat_score",
+                        "market_cap_b", "pe_forward", "dividend_yield", "perf_1y"]
+            available_adr = [c for c in adr_cols if c in adr_df.columns]
+            lines.append(adr_df[available_adr].to_markdown(index=False))
+            lines.append("")
 
     # By category
     for cat in df["category"].unique():
         cat_df = df[df["category"] == cat].sort_values("moat_score", ascending=False)
-        lines.append(f"## {cat.replace('_', ' ').title()}")
+        cat_title = cat.replace('_', ' ').title()
+        # Include the choke-point theme if available
+        if "choke_point_theme" in cat_df.columns:
+            theme = cat_df["choke_point_theme"].iloc[0]
+            if theme:
+                cat_title += f' — "{theme.replace("_", " ").title()}"'
+        lines.append(f"## {cat_title}")
         lines.append("")
-        cols = ["name", "ticker", "country", "moat_score", "price", "market_cap_b",
-                "pe_forward", "profit_margin", "revenue_growth", "perf_3m", "perf_1y"]
+        cols = ["name", "ticker", "adr", "country", "choke_point_tier", "moat_score",
+                "price", "market_cap_b", "pe_forward", "profit_margin", "revenue_growth",
+                "perf_3m", "perf_1y"]
         available = [c for c in cols if c in cat_df.columns]
         lines.append(cat_df[available].to_markdown(index=False))
         lines.append("")
