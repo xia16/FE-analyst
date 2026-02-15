@@ -1,0 +1,150 @@
+{
+  "ticker": "DUOL",
+  "company_name": "Duolingo, Inc.",
+  "report_type": "deep_dive",
+  "generated_at": "2026-02-15T12:00:00",
+  "data_as_of": "2026-02-14",
+  "composite_score": 64.9,
+  "recommendation": "BUY",
+  "component_scores": {
+    "fundamental": 82.0,
+    "valuation": 82.0,
+    "technical": 50.0,
+    "risk": 45.0,
+    "sentiment": 30.0
+  },
+  "weights": {
+    "fundamental": 0.30,
+    "valuation": 0.25,
+    "technical": 0.20,
+    "risk": 0.15,
+    "sentiment": 0.10
+  },
+  "contributions": {
+    "fundamental": 24.6,
+    "valuation": 20.5,
+    "technical": 10.0,
+    "risk": 6.75,
+    "sentiment": 3.0
+  },
+  "price_data": {
+    "current_price": 112.57,
+    "52_week_high": 544.93,
+    "52_week_low": 107.25,
+    "ytd_change_pct": -40.0,
+    "1_year_change_pct": -71.9
+  },
+  "valuation_data": {
+    "market_cap_billions": 5.29,
+    "enterprise_value_billions": 4.16,
+    "pe_trailing_reported": 14.32,
+    "pe_trailing_normalized": 32.4,
+    "pe_forward": 27.99,
+    "peg_ratio": 1.50,
+    "ps_ratio": 5.5,
+    "ev_ebitda": 23.40,
+    "ev_fcf": 11.72,
+    "ev_revenue": 4.10
+  },
+  "dcf_analysis": {
+    "base_case": {
+      "current_fcf_millions": 354.6,
+      "growth_rate": 0.20,
+      "terminal_growth": 0.025,
+      "discount_rate_wacc": 0.1325,
+      "projection_years": 5,
+      "enterprise_value_millions": 6633.1,
+      "equity_value_millions": 7655.8,
+      "intrinsic_per_share": 165.64,
+      "margin_of_safety_pct": 32.0,
+      "verdict": "UNDERVALUED"
+    },
+    "bear_case": {
+      "growth_rate": 0.15,
+      "discount_rate_wacc": 0.14,
+      "terminal_growth": 0.02,
+      "intrinsic_per_share": 130.0,
+      "margin_of_safety_pct": 13.2,
+      "verdict": "FAIR-UNDERVALUED"
+    },
+    "bull_case": {
+      "growth_rate": 0.25,
+      "discount_rate_wacc": 0.125,
+      "terminal_growth": 0.03,
+      "intrinsic_per_share": 217.0,
+      "margin_of_safety_pct": 48.0,
+      "verdict": "DEEPLY UNDERVALUED"
+    },
+    "reverse_dcf_implied_growth": "8-10%"
+  },
+  "fundamental_data": {
+    "revenue_ttm_millions": 1031,
+    "revenue_growth_yoy_pct": 40.0,
+    "gross_margin_pct": 72.5,
+    "operating_margin_pct": 13.7,
+    "net_margin_normalized_pct": 16.0,
+    "fcf_margin_pct": 34.6,
+    "roe_pct": 36.25,
+    "roic_pct": 86.08,
+    "current_ratio": 2.82,
+    "debt_to_equity": 0.07,
+    "net_cash_millions": 1023,
+    "net_cash_per_share": 22.15,
+    "fcf_ltm_millions": 354.6
+  },
+  "user_metrics": {
+    "dau_millions": 50,
+    "mau_millions": 130,
+    "paid_subscribers_millions": 11.5,
+    "dau_mau_ratio_pct": 37,
+    "dau_growth_yoy_pct": 36,
+    "mau_growth_yoy_pct": 24
+  },
+  "moat_analysis": {
+    "moat_score": 63.8,
+    "classification": "NARROW MOAT",
+    "durability": "NARROWING",
+    "dimensions": {
+      "market_dominance": 85,
+      "switching_costs": 55,
+      "technology_data_lockin": 65,
+      "platform_network_effects": 50,
+      "pricing_power": 70,
+      "barriers_to_entry": 55
+    }
+  },
+  "risk_data": {
+    "risk_level": "HIGH",
+    "annualized_volatility_est": 0.55,
+    "beta_est": 1.50,
+    "max_drawdown_52w": -0.7919,
+    "short_interest_pct_float": 14.93,
+    "days_to_cover": 3.43
+  },
+  "technical_signals": {
+    "rsi": {"signal": "BUY", "value": 17.4, "detail": "Deeply oversold"},
+    "ma_crossover": {"signal": "SELL", "detail": "Price below all major MAs"},
+    "macd": {"signal": "SELL", "detail": "Bearish momentum"},
+    "bbands": {"signal": "BUY", "detail": "Below lower band"}
+  },
+  "selloff_attribution": {
+    "ai_panic_pct": "50-60%",
+    "fundamental_pct": "20-25%",
+    "governance_other_pct": "10-15%"
+  },
+  "analyst_consensus": {
+    "rating": "Buy",
+    "buy_count": 13,
+    "hold_count": 9,
+    "sell_count": 1,
+    "average_price_target": 270.0,
+    "low_price_target": 160.0,
+    "high_price_target": 480.0
+  },
+  "next_earnings": "2026-02-26",
+  "key_upcoming_events": [
+    "CFO transition effective 2026-02-23",
+    "Q4/FY2025 earnings 2026-02-26",
+    "Options expiration mid-May 2026"
+  ]
+}
