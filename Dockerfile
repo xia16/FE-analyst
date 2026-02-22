@@ -41,11 +41,15 @@ RUN pip install --no-cache-dir -r /app/dashboard/api/requirements.txt
 
 # Copy project structure (preserves relative paths for PROJECT_ROOT)
 COPY configs/ /app/configs/
+
+# Reports directory — may be empty on first CI build; create stub so server doesn't crash
+RUN mkdir -p /app/reports/output
 COPY reports/output/ /app/reports/output/
+
+# Dashboard API source
 COPY dashboard/api/server.py /app/dashboard/api/server.py
 COPY dashboard/api/telegram_bot.py /app/dashboard/api/telegram_bot.py
 COPY dashboard/api/seed_portfolio.py /app/dashboard/api/seed_portfolio.py
-COPY dashboard/api/portfolio.db /app/dashboard/api/portfolio.db
 
 # Copy React build output → static directory served by FastAPI
 COPY --from=frontend-builder /build/dist/ /app/dashboard/api/static/

@@ -1,0 +1,4 @@
+Company,Ticker,Price,Currency,Mkt Cap ($B),P/E (Fwd),P/E (Trail),PEG,P/B,EV/EBITDA,P/S,Gross Margin %,Op Margin %,ROE %,ROA %,Rev Growth %,Earn Growth %,D/E,Current Ratio,Div Yield %,Perf 1M %,Perf 3M %,Perf 6M %,Perf 1Y %,Volatility,Beta,Sharpe,Max DD %
+Synopsys,SNPS,433.34,USD,82.9,25.66,53.7,,2.85,70.02,11.75,18.9,5.4,7.2,1.9,37.8,-66.5,50.46,1.61,,-17.5,10.1,-29.7,,0.4783,1.5838,-0.1216,-40.5
+Cadence,CDNS,283.34,USD,77.2,35.18,73.01,,14.83,40.75,14.81,20.4,35.1,21.7,11.1,10.1,20.7,47.69,3.05,,-13.4,-12.8,-18.8,,0.375,1.4925,-0.0492,-29.0
+ARM Holdings,ARM,120.45,USD,127.9,55.78,160.6,,16.4,118.37,27.39,17.1,15.4,11.3,5.9,26.3,-12.3,5.91,5.43,,7.7,-21.0,-14.6,,0.6843,2.5213,0.3138,-54.0

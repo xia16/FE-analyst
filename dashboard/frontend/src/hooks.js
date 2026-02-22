@@ -46,7 +46,7 @@ export function useDomainMeta(domainId) {
   return useFetch(`/domains/${domainId}`, { enabled: !!domainId })
 }
 
-export function useDomainPortfolio(domainId) {
+export function useDomainWatchlist(domainId) {
   return useFetch(`/domains/${domainId}/portfolio`, { enabled: !!domainId, refreshInterval: 60000 })
 }
 
