@@ -13,12 +13,14 @@ from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "portfolio.db"
 
+# Portfolio name for this set of holdings
+PORTFOLIO_NAME = "SG Brokerage"
+
 # Holdings data: (ticker, name, shares, avg_cost, sector, country)
 # avg_cost derived from current price / (1 + gain%)
-# For entries with gain %, we store the cost basis.
 HOLDINGS = [
     # Ticker, Name, Shares, Avg Cost (USD), Sector, Country
-    ("GLD", "SPDR Gold Shares", 15, 366.00, "Commodities", "US"),
+    ("GLD", "SPDR Gold Shares", 500, 365.85, "Commodities", "US"),
     ("VOO", "Vanguard S&P 500 ETF", 15, 284.50, "ETF - Index", "US"),
     ("AFRM", "Affirm Holdings", 450, 90.00, "Fintech", "US"),
     ("ALAB", "Astera Labs", 250, 95.00, "Semiconductors", "US"),
@@ -47,19 +49,6 @@ HOLDINGS = [
     ("TOST", "Toast", 800, 36.00, "Fintech", "US"),
     ("MC.PA", "LVMH Moet Hennessy", 60, 820.00, "Luxury", "France"),
 ]
-
-# Sector classification for allocation charts
-SECTOR_MAP = {
-    "Semiconductors": ["ALAB", "AMD", "ASML", "CRDO", "MU", "NVDA"],
-    "Tech - Cloud/SaaS": ["AMZN", "CRM"],
-    "Tech - Social": ["META", "RDDT"],
-    "Fintech": ["AFRM", "HOOD", "TOST"],
-    "Banking": ["BAC", "GS", "JPM"],
-    "Cybersecurity": ["CRWV", "RBRK"],
-    "ETFs": ["GLD", "VOO", "QQQ", "FIG", "IBIT"],
-    "Healthcare": ["NUTX", "TMDX"],
-    "Other": ["BABA", "DUOL", "MC.PA"],
-}
 
 
 def seed():
@@ -92,15 +81,16 @@ def seed():
         )
     """)
 
-    # Add sector and country columns if they don't exist
-    try:
-        conn.execute("ALTER TABLE holdings ADD COLUMN sector TEXT DEFAULT ''")
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-    try:
-        conn.execute("ALTER TABLE holdings ADD COLUMN country TEXT DEFAULT ''")
-    except sqlite3.OperationalError:
-        pass  # Column already exists
+    # Add columns if they don't exist
+    for col, default in [
+        ("sector", "''"),
+        ("country", "''"),
+        ("portfolio_name", "''"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE holdings ADD COLUMN {col} TEXT DEFAULT {default}")
+        except sqlite3.OperationalError:
+            pass
 
     # Clear existing holdings (fresh seed)
     conn.execute("DELETE FROM holdings")
@@ -109,9 +99,9 @@ def seed():
         total_invested = shares * avg_cost
         conn.execute(
             """INSERT OR REPLACE INTO holdings
-               (ticker, name, exchange, quantity, avg_cost, total_invested, sector, country)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (ticker, name, "", shares, avg_cost, total_invested, sector, country),
+               (ticker, name, exchange, quantity, avg_cost, total_invested, sector, country, portfolio_name)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (ticker, name, "", shares, avg_cost, total_invested, sector, country, PORTFOLIO_NAME),
         )
         print(f"  Seeded {ticker:8s} — {shares:>5d} shares @ ${avg_cost:.2f} = ${total_invested:>10,.2f}  [{sector}]")
 
@@ -120,6 +110,7 @@ def seed():
     # Summary
     row = conn.execute("SELECT COUNT(*), SUM(total_invested) FROM holdings").fetchone()
     print(f"\nSeeded {row[0]} holdings, total invested: ${row[1]:,.2f}")
+    print(f"Portfolio: {PORTFOLIO_NAME}")
 
     conn.close()
 

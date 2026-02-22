@@ -51,6 +51,9 @@ COPY dashboard/api/server.py /app/dashboard/api/server.py
 COPY dashboard/api/telegram_bot.py /app/dashboard/api/telegram_bot.py
 COPY dashboard/api/seed_portfolio.py /app/dashboard/api/seed_portfolio.py
 
+# Seed portfolio DB at build time (bakes holdings into image)
+RUN python /app/dashboard/api/seed_portfolio.py
+
 # Copy React build output → static directory served by FastAPI
 COPY --from=frontend-builder /build/dist/ /app/dashboard/api/static/
 

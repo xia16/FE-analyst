@@ -99,6 +99,9 @@ export default function MyPortfolioView({ onSelectTicker }) {
       {/* Hero: Total Value + P&L + Lock button */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
+          {summary.portfolio_name && (
+            <div className="text-[10px] font-medium text-[#3b82f6] mb-0.5">{summary.portfolio_name}</div>
+          )}
           <div className="text-[#8b8d97] text-xs mb-1">Total Portfolio Value</div>
           <div className="text-3xl sm:text-4xl font-bold tracking-tight">
             {locked ? '$\u2022\u2022\u2022,\u2022\u2022\u2022' : (

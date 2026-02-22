@@ -886,6 +886,9 @@ def api_get_holdings():
     total_market_value = sum(h["market_value"] for h in enriched if h["market_value"])
     total_pnl = total_market_value - total_invested if total_market_value else None
 
+    # Detect portfolio name(s) from holdings
+    portfolio_names = list(set(h.get("portfolio_name", "") for h in holdings if h.get("portfolio_name")))
+
     return {
         "holdings": enriched,
         "summary": {
@@ -894,6 +897,7 @@ def api_get_holdings():
             "total_market_value": round(total_market_value, 2) if total_market_value else None,
             "total_pnl": round(total_pnl, 2) if total_pnl else None,
             "total_pnl_pct": round(total_pnl / total_invested * 100, 2) if total_pnl and total_invested else None,
+            "portfolio_name": portfolio_names[0] if len(portfolio_names) == 1 else ", ".join(portfolio_names) if portfolio_names else None,
         },
         "timestamp": datetime.utcnow().isoformat(),
     }
