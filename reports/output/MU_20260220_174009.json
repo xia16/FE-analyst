@@ -1,0 +1,112 @@
+{
+  "ticker": "MU",
+  "composite_score": 41.5,
+  "recommendation": "SELL",
+  "component_scores": {
+    "fundamental": 85.0,
+    "valuation": 0,
+    "technical": 25.0,
+    "sentiment": 50,
+    "risk": 39.8
+  },
+  "weights": {
+    "fundamental": 0.3,
+    "valuation": 0.25,
+    "technical": 0.2,
+    "sentiment": 0.1,
+    "risk": 0.15
+  },
+  "details": {
+    "fundamental": {
+      "ticker": "MU",
+      "company": "Micron Technology, Inc.",
+      "sector": "Technology",
+      "health": {
+        "score": 6,
+        "max_score": 6,
+        "reasons": [
+          "Strong current ratio: 2.46",
+          "Low debt/equity: 21.2",
+          "Strong ROE: 22.6%"
+        ]
+      },
+      "growth": {
+        "score": 4,
+        "max_score": 4,
+        "reasons": [
+          "Strong revenue growth: 56.7%",
+          "Strong earnings growth: 175.4%"
+        ]
+      },
+      "valuation": {
+        "score": 2,
+        "max_score": 4,
+        "reasons": [
+          "Low forward P/E: 9.4"
+        ]
+      },
+      "ratios": {
+        "ticker": "MU",
+        "pe_trailing": 39.67205,
+        "pe_forward": 9.367352,
+        "peg_ratio": null,
+        "pb_ratio": 7.9912305,
+        "ps_ratio": 11.101609,
+        "ev_ebitda": 21.225,
+        "profit_margin": 0.28146,
+        "operating_margin": 0.44974998,
+        "roe": 0.22554001,
+        "roa": 0.10934,
+        "debt_to_equity": 21.244,
+        "current_ratio": 2.46,
+        "quick_ratio": 1.7,
+        "dividend_yield": 0.11,
+        "payout_ratio": 0.0437,
+        "revenue_growth": 0.567,
+        "earnings_growth": 1.754
+      }
+    },
+    "valuation": {
+      "current_fcf": 1668000000.0,
+      "discount_rate": 0.10089999999999999,
+      "growth_rate": 0.08,
+      "terminal_growth": 0.025,
+      "enterprise_value": 28344020596.515495,
+      "intrinsic_per_share": 25.18,
+      "current_price": 417.35,
+      "margin_of_safety_pct": -1557.25,
+      "verdict": "OVERVALUED"
+    },
+    "technical": {
+      "rsi": {
+        "signal": "HOLD",
+        "value": 59.42,
+        "reason": "Neutral"
+      },
+      "ma_crossover": {
+        "signal": "BUY",
+        "reason": "Price above rising MAs"
+      },
+      "macd": {
+        "signal": "SELL",
+        "reason": "MACD below signal"
+      },
+      "bbands": {
+        "signal": "HOLD",
+        "reason": "Within bands"
+      }
+    },
+    "risk": {
+      "ticker": "MU",
+      "period": "2y",
+      "volatility": 0.6018,
+      "sharpe_ratio": 1.6155,
+      "sortino_ratio": 2.4507,
+      "max_drawdown": -0.5763,
+      "beta": 2.229,
+      "var_95": -0.0475,
+      "cvar_95": -0.0792,
+      "risk_level": "VERY HIGH"
+    }
+  }
+}

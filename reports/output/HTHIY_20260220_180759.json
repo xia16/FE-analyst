@@ -1,0 +1,111 @@
+{
+  "ticker": "HTHIY",
+  "composite_score": 54.2,
+  "recommendation": "HOLD",
+  "component_scores": {
+    "fundamental": 57.5,
+    "valuation": 100,
+    "technical": 0.0,
+    "sentiment": 50,
+    "risk": 46.5
+  },
+  "weights": {
+    "fundamental": 0.3,
+    "valuation": 0.25,
+    "technical": 0.2,
+    "sentiment": 0.1,
+    "risk": 0.15
+  },
+  "details": {
+    "fundamental": {
+      "ticker": "HTHIY",
+      "company": "Hitachi, Ltd.",
+      "sector": "Industrials",
+      "health": {
+        "score": 3,
+        "max_score": 6,
+        "reasons": [
+          "Adequate current ratio: 1.08",
+          "Low debt/equity: 16.1"
+        ]
+      },
+      "growth": {
+        "score": 3,
+        "max_score": 4,
+        "reasons": [
+          "Moderate revenue growth: 10.1%",
+          "Strong earnings growth: 21.3%"
+        ]
+      },
+      "valuation": {
+        "score": 2,
+        "max_score": 4,
+        "reasons": [
+          "Low forward P/E: 13.0"
+        ]
+      },
+      "ratios": {
+        "ticker": "HTHIY",
+        "pe_trailing": 29.477064,
+        "pe_forward": 12.955646,
+        "peg_ratio": null,
+        "pb_ratio": 3.536936,
+        "ps_ratio": 0.014106046,
+        "ev_ebitda": -0.079,
+        "profit_margin": 0.08015,
+        "operating_margin": 0.11703,
+        "roe": null,
+        "roa": null,
+        "debt_to_equity": 16.116,
+        "current_ratio": 1.083,
+        "quick_ratio": 0.742,
+        "dividend_yield": 0.94,
+        "payout_ratio": 0.268,
+        "revenue_growth": 0.101,
+        "earnings_growth": 0.213
+      }
+    },
+    "valuation": {
+      "current_fcf": 780592000000.0,
+      "discount_rate": 0.10089999999999999,
+      "growth_rate": 0.08,
+      "terminal_growth": 0.025,
+      "enterprise_value": 13264457868989.94,
+      "intrinsic_per_share": 2940.75,
+      "current_price": 32.13,
+      "margin_of_safety_pct": 98.91,
+      "verdict": "UNDERVALUED"
+    },
+    "technical": {
+      "rsi": {
+        "signal": "HOLD",
+        "value": 41.99,
+        "reason": "Neutral"
+      },
+      "ma_crossover": {
+        "signal": "HOLD",
+        "reason": "Mixed MA signals"
+      },
+      "macd": {
+        "signal": "SELL",
+        "reason": "MACD below signal"
+      },
+      "bbands": {
+        "signal": "HOLD",
+        "reason": "Within bands"
+      }
+    },
+    "risk": {
+      "ticker": "HTHIY",
+      "period": "2y",
+      "volatility": 0.5354,
+      "sharpe_ratio": 0.2434,
+      "sortino_ratio": 0.2269,
+      "max_drawdown": -0.6669,
+      "beta": 1.1619,
+      "var_95": -0.0378,
+      "cvar_95": -0.0782,
+      "risk_level": "VERY HIGH"
+    }
+  }
+}

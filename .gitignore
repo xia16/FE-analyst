@@ -13,6 +13,7 @@ eggs/
 venv/
 .venv/
 env/
+dashboard/api/venv/
 
 # Environment variables (contains API keys)
 .env
@@ -35,8 +36,10 @@ data/raw/*.parquet
 !data/cache/.gitkeep
 
 # Reports output
-reports/output/
-!reports/output/.gitkeep
+reports/output/_archive/
+
+# Node
+node_modules/
 
 # OS
 .DS_Store
