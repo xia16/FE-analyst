@@ -910,6 +910,61 @@ def api_get_trades(limit: int = 50):
 
 
 # ---------------------------------------------------------------------------
+# Manual position adjustment endpoints
+# ---------------------------------------------------------------------------
+
+from pydantic import BaseModel
+
+class PositionUpdate(BaseModel):
+    ticker: str
+    name: Optional[str] = None
+    quantity: int
+    avg_cost: float
+    sector: Optional[str] = ""
+    country: Optional[str] = ""
+    portfolio_name: Optional[str] = "SG Brokerage"
+
+
+@app.post("/api/holdings/adjust")
+def adjust_position(pos: PositionUpdate):
+    """Add or update a position manually."""
+    import sqlite3 as _sql
+    db_path = Path(__file__).parent / "portfolio.db"
+    conn = _sql.connect(db_path)
+
+    # Ensure extra columns exist
+    for col in ("sector", "country", "portfolio_name"):
+        try:
+            conn.execute(f"ALTER TABLE holdings ADD COLUMN {col} TEXT DEFAULT ''")
+        except _sql.OperationalError:
+            pass
+
+    total_invested = pos.quantity * pos.avg_cost
+    conn.execute(
+        """INSERT OR REPLACE INTO holdings
+           (ticker, name, exchange, quantity, avg_cost, total_invested, sector, country, portfolio_name)
+           VALUES (?, ?, '', ?, ?, ?, ?, ?, ?)""",
+        (pos.ticker.upper(), pos.name or pos.ticker.upper(), pos.quantity,
+         pos.avg_cost, total_invested, pos.sector, pos.country, pos.portfolio_name),
+    )
+    conn.commit()
+    conn.close()
+    return {"status": "ok", "ticker": pos.ticker.upper(), "quantity": pos.quantity, "avg_cost": pos.avg_cost}
+
+
+@app.delete("/api/holdings/{ticker}")
+def remove_position(ticker: str):
+    """Remove a position entirely."""
+    import sqlite3 as _sql
+    db_path = Path(__file__).parent / "portfolio.db"
+    conn = _sql.connect(db_path)
+    conn.execute("DELETE FROM holdings WHERE ticker = ?", (ticker.upper(),))
+    conn.commit()
+    conn.close()
+    return {"status": "ok", "removed": ticker.upper()}
+
+
+# ---------------------------------------------------------------------------
 # Holdings analytics endpoints
 # ---------------------------------------------------------------------------
 

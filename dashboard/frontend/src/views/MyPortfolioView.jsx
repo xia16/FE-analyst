@@ -42,6 +42,14 @@ export default function MyPortfolioView({ onSelectTicker }) {
   const [pwInput, setPwInput] = useState('')
   const [pwError, setPwError] = useState(false)
 
+  // Adjust position modal state
+  const [showAdjust, setShowAdjust] = useState(false)
+  const [adjustForm, setAdjustForm] = useState({ ticker: '', name: '', quantity: '', avg_cost: '', sector: '', country: '' })
+  const [adjustSaving, setAdjustSaving] = useState(false)
+  const [adjustError, setAdjustError] = useState(null)
+
+  const [lockTimer, setLockTimer] = useState(null)
+
   const handleUnlock = async () => {
     const hash = await sha256(pwInput)
     if (hash === UNLOCK_HASH) {
@@ -49,8 +57,74 @@ export default function MyPortfolioView({ onSelectTicker }) {
       setShowPwPrompt(false)
       setPwInput('')
       setPwError(false)
+      // Auto-lock after 5 minutes
+      if (lockTimer) clearTimeout(lockTimer)
+      const timer = setTimeout(() => setLocked(true), 5 * 60 * 1000)
+      setLockTimer(timer)
     } else {
       setPwError(true)
+    }
+  }
+
+  const handleLock = () => {
+    setLocked(true)
+    if (lockTimer) { clearTimeout(lockTimer); setLockTimer(null) }
+  }
+
+  const openAdjust = (holding = null) => {
+    if (holding) {
+      setAdjustForm({
+        ticker: holding.ticker,
+        name: holding.quote_name || holding.name || '',
+        quantity: String(holding.quantity),
+        avg_cost: String(holding.avg_cost),
+        sector: holding.sector || '',
+        country: holding.country || '',
+      })
+    } else {
+      setAdjustForm({ ticker: '', name: '', quantity: '', avg_cost: '', sector: '', country: '' })
+    }
+    setAdjustError(null)
+    setShowAdjust(true)
+  }
+
+  const handleAdjustSave = async () => {
+    if (!adjustForm.ticker.trim() || !adjustForm.quantity || !adjustForm.avg_cost) {
+      setAdjustError('Ticker, quantity, and avg cost are required')
+      return
+    }
+    setAdjustSaving(true)
+    setAdjustError(null)
+    try {
+      const res = await fetch('/api/holdings/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticker: adjustForm.ticker.trim().toUpperCase(),
+          name: adjustForm.name.trim() || null,
+          quantity: parseInt(adjustForm.quantity),
+          avg_cost: parseFloat(adjustForm.avg_cost),
+          sector: adjustForm.sector,
+          country: adjustForm.country,
+        }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setShowAdjust(false)
+      refetch()
+    } catch (err) {
+      setAdjustError(err.message)
+    } finally {
+      setAdjustSaving(false)
+    }
+  }
+
+  const handleRemovePosition = async (ticker) => {
+    if (!confirm(`Remove ${ticker} from portfolio?`)) return
+    try {
+      await fetch(`/api/holdings/${ticker}`, { method: 'DELETE' })
+      refetch()
+    } catch (err) {
+      console.error('Failed to remove position:', err)
     }
   }
 
@@ -140,6 +214,16 @@ export default function MyPortfolioView({ onSelectTicker }) {
           >
             Refresh
           </button>
+          {/* Adjust positions button */}
+          <button
+            onClick={() => openAdjust()}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#8b8d97] hover:text-white hover:bg-[#1e2130] transition-colors flex items-center gap-1.5 border border-[#2a2d3e]"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add Position
+          </button>
           {/* Lock / Unlock button */}
           <button
             onClick={() => {
@@ -148,7 +232,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
                 setPwError(false)
                 setPwInput('')
               } else {
-                setLocked(true)
+                handleLock()
               }
             }}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
@@ -200,6 +284,94 @@ export default function MyPortfolioView({ onSelectTicker }) {
                 className="flex-1 px-4 py-2 rounded-lg text-xs font-medium text-white bg-[#3b82f6] hover:bg-[#2563eb] transition-colors"
               >
                 Unlock
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Adjust position modal */}
+      {showAdjust && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowAdjust(false)}>
+          <div className="bg-[#1e2130] border border-[#2a2d3e] rounded-xl p-6 w-96 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold mb-4">{adjustForm.ticker ? `Edit ${adjustForm.ticker}` : 'Add Position'}</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] text-[#8b8d97] block mb-1">Ticker *</label>
+                <input
+                  value={adjustForm.ticker}
+                  onChange={e => setAdjustForm({ ...adjustForm, ticker: e.target.value })}
+                  placeholder="e.g. AAPL"
+                  className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#3b82f6]"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-[#8b8d97] block mb-1">Name</label>
+                <input
+                  value={adjustForm.name}
+                  onChange={e => setAdjustForm({ ...adjustForm, name: e.target.value })}
+                  placeholder="e.g. Apple Inc"
+                  className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3b82f6]"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-[#8b8d97] block mb-1">Shares *</label>
+                  <input
+                    type="number"
+                    value={adjustForm.quantity}
+                    onChange={e => setAdjustForm({ ...adjustForm, quantity: e.target.value })}
+                    placeholder="100"
+                    className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#3b82f6]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#8b8d97] block mb-1">Avg Cost (USD) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={adjustForm.avg_cost}
+                    onChange={e => setAdjustForm({ ...adjustForm, avg_cost: e.target.value })}
+                    placeholder="150.00"
+                    className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#3b82f6]"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-[#8b8d97] block mb-1">Sector</label>
+                  <input
+                    value={adjustForm.sector}
+                    onChange={e => setAdjustForm({ ...adjustForm, sector: e.target.value })}
+                    placeholder="e.g. Tech"
+                    className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3b82f6]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#8b8d97] block mb-1">Country</label>
+                  <input
+                    value={adjustForm.country}
+                    onChange={e => setAdjustForm({ ...adjustForm, country: e.target.value })}
+                    placeholder="e.g. US"
+                    className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3b82f6]"
+                  />
+                </div>
+              </div>
+            </div>
+            {adjustError && <p className="text-red-400 text-xs mt-3">{adjustError}</p>}
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setShowAdjust(false)}
+                className="flex-1 px-4 py-2 rounded-lg text-xs font-medium text-[#8b8d97] hover:text-white bg-[#0f1117] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAdjustSave}
+                disabled={adjustSaving}
+                className="flex-1 px-4 py-2 rounded-lg text-xs font-medium text-white bg-[#3b82f6] hover:bg-[#2563eb] disabled:opacity-50 transition-colors"
+              >
+                {adjustSaving ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>
@@ -298,7 +470,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
                     return (
                       <tr
                         key={h.ticker}
-                        className="border-b border-[#2a2d3e]/50 hover:bg-[#252940] transition-colors cursor-pointer"
+                        className="group border-b border-[#2a2d3e]/50 hover:bg-[#252940] transition-colors cursor-pointer"
                         onClick={() => onSelectTicker(h.ticker)}
                       >
                         <td className="py-2 pr-2 font-mono font-semibold">{h.ticker}</td>
@@ -322,6 +494,28 @@ export default function MyPortfolioView({ onSelectTicker }) {
                               <div className="h-full bg-[#3b82f6] rounded-full" style={{ width: `${Math.min(100, weight)}%` }} />
                             </div>
                             <span className="text-[10px] font-mono text-[#8b8d97] w-8 text-right">{weight.toFixed(1)}%</span>
+                          </div>
+                        </td>
+                        <td className="py-2 pl-2">
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openAdjust(h) }}
+                              className="p-1 rounded hover:bg-[#0f1117] text-[#8b8d97] hover:text-[#3b82f6]"
+                              title="Edit position"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleRemovePosition(h.ticker) }}
+                              className="p-1 rounded hover:bg-[#0f1117] text-[#8b8d97] hover:text-red-400"
+                              title="Remove position"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
                           </div>
                         </td>
                       </tr>
