@@ -1,0 +1,7 @@
+# Domain registry — each domain is a self-contained investment thesis
+# To add a new domain: create a YAML file in configs/domains/ and add an entry here.
+
+domains:
+  - id: ai_infrastructure
+    file: domains/ai_infrastructure.yaml
+    color: "#3b82f6"

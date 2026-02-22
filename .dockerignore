@@ -1,0 +1,53 @@
+# Python virtual environments
+venv/
+.venv/
+dashboard/api/venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Node
+dashboard/frontend/node_modules/
+
+# Data (ephemeral cache, not needed in image)
+data/cache/
+data/raw/
+data/processed/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude / AI tooling
+.claude/
+
+# Secrets
+.env
+.env.*
+
+# Analysis pipeline (not needed for dashboard container)
+src/
+sops/
+tests/
+notebooks/
+models/
+scripts/
+main.py
+setup.sh
+requirements.txt
+
+# Reports archive
+reports/output/_archive/
+
+# Docs (not needed in container)
+*.md
+!reports/**/*.md

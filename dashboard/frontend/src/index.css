@@ -1,0 +1,205 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #0f1117;
+  --bg-secondary: #1a1d27;
+  --bg-card: #1e2130;
+  --bg-card-hover: #252940;
+  --border: #2a2d3e;
+  --text-primary: #e4e5e7;
+  --text-secondary: #8b8d97;
+  --accent-green: #22c55e;
+  --accent-red: #ef4444;
+  --accent-blue: #3b82f6;
+  --accent-yellow: #eab308;
+  --accent-purple: #a855f7;
+  --accent-cyan: #06b6d4;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3d4e; }
+
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out forwards;
+}
+
+/* ─── Markdown Report Styles ─────────────────────────── */
+.markdown-report {
+  color: #e4e5e7;
+  line-height: 1.75;
+  font-size: 0.875rem;
+}
+
+.markdown-report h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  border-bottom: 1px solid #2a2d3e;
+  padding-bottom: 0.5rem;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
+.markdown-report h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #fff;
+  border-bottom: 1px solid #2a2d3e;
+  padding-bottom: 0.4rem;
+  margin-top: 1.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.markdown-report h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e4e5e7;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-report h4, .markdown-report h5, .markdown-report h6 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e4e5e7;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-report p {
+  margin-bottom: 0.75rem;
+}
+
+.markdown-report ul, .markdown-report ol {
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.markdown-report ul { list-style-type: disc; }
+.markdown-report ol { list-style-type: decimal; }
+
+.markdown-report li {
+  margin-bottom: 0.25rem;
+}
+
+.markdown-report li > ul, .markdown-report li > ol {
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+}
+
+.markdown-report strong {
+  color: #fff;
+  font-weight: 600;
+}
+
+.markdown-report em {
+  color: #c4c5c7;
+}
+
+.markdown-report a {
+  color: #60a5fa;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.markdown-report a:hover {
+  color: #93c5fd;
+}
+
+.markdown-report code {
+  background: #1a1d27;
+  color: #22d3ee;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+.markdown-report pre {
+  background: #0f1117;
+  border: 1px solid #2a2d3e;
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+.markdown-report pre code {
+  background: none;
+  padding: 0;
+  color: #e4e5e7;
+}
+
+.markdown-report blockquote {
+  border-left: 3px solid #3b82f6;
+  padding-left: 1rem;
+  margin-left: 0;
+  margin-bottom: 0.75rem;
+  color: #8b8d97;
+  font-style: italic;
+}
+
+.markdown-report hr {
+  border: none;
+  border-top: 1px solid #2a2d3e;
+  margin: 1.5rem 0;
+}
+
+/* Tables */
+.markdown-report table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+}
+
+.markdown-report thead {
+  background: #252940;
+}
+
+.markdown-report th {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: #e4e5e7;
+  border-bottom: 2px solid #2a2d3e;
+  white-space: nowrap;
+}
+
+.markdown-report td {
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid #2a2d3e;
+  color: #c4c5c7;
+}
+
+.markdown-report tbody tr:hover {
+  background: #1a1d27;
+}
+
+.markdown-report img {
+  max-width: 100%;
+  border-radius: 8px;
+}
