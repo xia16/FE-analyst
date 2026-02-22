@@ -852,6 +852,15 @@ async def process_trade_message(request: Request):
     return result
 
 
+def _get_eur_usd_rate() -> float:
+    """Fetch EUR/USD exchange rate from yfinance. Falls back to 1.05."""
+    try:
+        tk = yf.Ticker("EURUSD=X")
+        return tk.fast_info.last_price or 1.05
+    except Exception:
+        return 1.05
+
+
 @app.get("/api/holdings")
 def api_get_holdings():
     """Get current portfolio holdings with live quotes."""
@@ -861,12 +870,29 @@ def api_get_holdings():
     # Fetch live quotes for all holdings
     live_quotes = _get_bulk_quotes(tickers) if tickers else {}
 
+    # Fetch EUR/USD rate if any holdings are EUR-denominated
+    has_eur = any(h.get("currency", "USD") == "EUR" for h in holdings)
+    eur_usd = _get_eur_usd_rate() if has_eur else None
+
     enriched = []
     for h in holdings:
         quote = live_quotes.get(h["ticker"], {})
         current_price = quote.get("price")
-        market_value = current_price * h["quantity"] if current_price else None
-        cost_basis = h["total_invested"]
+        currency = h.get("currency", "USD")
+
+        # For EUR holdings: price from yfinance is in EUR, cost basis is in EUR
+        # Convert both to USD for portfolio totals
+        if currency == "EUR" and eur_usd and current_price:
+            price_usd = current_price * eur_usd
+            avg_cost_usd = h["avg_cost"] * eur_usd
+            market_value = price_usd * h["quantity"]
+            cost_basis = avg_cost_usd * h["quantity"]
+        else:
+            price_usd = current_price
+            avg_cost_usd = h["avg_cost"]
+            market_value = current_price * h["quantity"] if current_price else None
+            cost_basis = h["total_invested"]
+
         unrealized_pnl = (market_value - cost_basis) if market_value else None
         unrealized_pct = (unrealized_pnl / cost_basis * 100) if unrealized_pnl and cost_basis else None
 
@@ -874,7 +900,10 @@ def api_get_holdings():
             **h,
             "sector": h.get("sector", ""),
             "country": h.get("country", ""),
+            "currency": currency,
             "current_price": current_price,
+            "current_price_usd": round(price_usd, 2) if price_usd else None,
+            "avg_cost_usd": round(avg_cost_usd, 2),
             "market_value": round(market_value, 2) if market_value else None,
             "unrealized_pnl": round(unrealized_pnl, 2) if unrealized_pnl else None,
             "unrealized_pct": round(unrealized_pct, 2) if unrealized_pct else None,
@@ -882,7 +911,7 @@ def api_get_holdings():
             "quote_name": quote.get("name"),
         })
 
-    total_invested = sum(h["total_invested"] for h in holdings)
+    total_invested = sum(h["avg_cost_usd"] * h["quantity"] for h in enriched)
     total_market_value = sum(h["market_value"] for h in enriched if h["market_value"])
     total_pnl = total_market_value - total_invested if total_market_value else None
 
@@ -898,6 +927,7 @@ def api_get_holdings():
             "total_pnl": round(total_pnl, 2) if total_pnl else None,
             "total_pnl_pct": round(total_pnl / total_invested * 100, 2) if total_pnl and total_invested else None,
             "portfolio_name": portfolio_names[0] if len(portfolio_names) == 1 else ", ".join(portfolio_names) if portfolio_names else None,
+            "eur_usd_rate": eur_usd,
         },
         "timestamp": datetime.utcnow().isoformat(),
     }
@@ -922,6 +952,7 @@ class PositionUpdate(BaseModel):
     avg_cost: float
     sector: Optional[str] = ""
     country: Optional[str] = ""
+    currency: Optional[str] = "USD"
     portfolio_name: Optional[str] = "SG Brokerage"
 
 
@@ -933,7 +964,7 @@ def adjust_position(pos: PositionUpdate):
     conn = _sql.connect(db_path)
 
     # Ensure extra columns exist
-    for col in ("sector", "country", "portfolio_name"):
+    for col in ("sector", "country", "portfolio_name", "currency"):
         try:
             conn.execute(f"ALTER TABLE holdings ADD COLUMN {col} TEXT DEFAULT ''")
         except _sql.OperationalError:
@@ -942,10 +973,10 @@ def adjust_position(pos: PositionUpdate):
     total_invested = pos.quantity * pos.avg_cost
     conn.execute(
         """INSERT OR REPLACE INTO holdings
-           (ticker, name, exchange, quantity, avg_cost, total_invested, sector, country, portfolio_name)
-           VALUES (?, ?, '', ?, ?, ?, ?, ?, ?)""",
+           (ticker, name, exchange, quantity, avg_cost, total_invested, sector, country, portfolio_name, currency)
+           VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?)""",
         (pos.ticker.upper(), pos.name or pos.ticker.upper(), pos.quantity,
-         pos.avg_cost, total_invested, pos.sector, pos.country, pos.portfolio_name),
+         pos.avg_cost, total_invested, pos.sector, pos.country, pos.portfolio_name, pos.currency),
     )
     conn.commit()
     conn.close()

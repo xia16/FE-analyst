@@ -16,38 +16,40 @@ DB_PATH = Path(__file__).parent / "portfolio.db"
 # Portfolio name for this set of holdings
 PORTFOLIO_NAME = "SG Brokerage"
 
-# Holdings data: (ticker, name, shares, avg_cost, sector, country)
-# avg_cost derived from current price / (1 + gain%)
+# Holdings data: (ticker, name, shares, avg_cost, sector, country, currency)
+# avg_cost calculated as: current_price / (1 + broker_gain%/100)
+# Prices as of market close 2026-02-21 from yfinance via deployed API.
+# MC.PA is priced in EUR on Yahoo Finance; cost basis stored in EUR.
 HOLDINGS = [
-    # Ticker, Name, Shares, Avg Cost (USD), Sector, Country
-    ("GLD", "SPDR Gold Shares", 500, 365.85, "Commodities", "US"),
-    ("VOO", "Vanguard S&P 500 ETF", 15, 284.50, "ETF - Index", "US"),
-    ("AFRM", "Affirm Holdings", 450, 90.00, "Fintech", "US"),
-    ("ALAB", "Astera Labs", 250, 95.00, "Semiconductors", "US"),
-    ("AMD", "Advanced Micro Devices", 283, 57.50, "Semiconductors", "US"),
-    ("AMZN", "Amazon.com", 200, 195.00, "Tech - Cloud", "US"),
-    ("ASML", "ASML Holding", 30, 322.50, "Semiconductors", "Netherlands"),
-    ("CRDO", "Credo Technology", 15, 42.00, "Semiconductors", "US"),
-    ("CRWV", "CrowdStrike Holdings", 350, 88.00, "Cybersecurity", "US"),
-    ("DUOL", "Duolingo", 290, 330.00, "EdTech", "US"),
-    ("HOOD", "Robinhood Markets", 150, 56.00, "Fintech", "US"),
-    ("IBIT", "iShares Bitcoin Trust", 238, 67.00, "Crypto ETF", "US"),
-    ("META", "Meta Platforms", 100, 590.00, "Tech - Social", "US"),
-    ("MU", "Micron Technology", 100, 97.00, "Semiconductors", "US"),
-    ("NUTX", "Nutex Health", 250, 78.00, "Healthcare", "US"),
-    ("NVDA", "NVIDIA Corporation", 200, 82.50, "Semiconductors", "US"),
-    ("QQQ", "Invesco QQQ Trust", 120, 498.50, "ETF - Nasdaq", "US"),
-    ("TMDX", "TransMedics Group", 150, 74.50, "Healthcare", "US"),
-    ("BABA", "Alibaba Group", 150, 133.50, "Tech - eCommerce", "China"),
-    ("BAC", "Bank of America", 88, 26.50, "Banking", "US"),
-    ("CRM", "Salesforce", 15, 287.00, "Tech - SaaS", "US"),
-    ("FIG", "Simplify Exchange Traded Funds", 650, 29.00, "ETF - Alt", "US"),
-    ("GS", "Goldman Sachs", 13, 242.50, "Banking", "US"),
-    ("JPM", "JPMorgan Chase", 80, 108.00, "Banking", "US"),
-    ("RBRK", "Rubrik", 245, 68.00, "Cybersecurity", "US"),
-    ("RDDT", "Reddit", 150, 139.00, "Tech - Social", "US"),
-    ("TOST", "Toast", 800, 36.00, "Fintech", "US"),
-    ("MC.PA", "LVMH Moet Hennessy", 60, 820.00, "Luxury", "France"),
+    # Ticker, Name, Shares, Avg Cost, Sector, Country, Currency
+    ("GLD", "SPDR Gold Shares", 500, 365.85, "Commodities", "US", "USD"),
+    ("VOO", "Vanguard S&P 500 ETF", 15, 360.38, "ETF - Index", "US", "USD"),
+    ("AFRM", "Affirm Holdings", 450, 71.70, "Fintech", "US", "USD"),
+    ("ALAB", "Astera Labs", 250, 169.76, "Semiconductors", "US", "USD"),
+    ("AMD", "Advanced Micro Devices", 283, 120.90, "Semiconductors", "US", "USD"),
+    ("AMZN", "Amazon.com", 200, 205.37, "Tech - Cloud", "US", "USD"),
+    ("ASML", "ASML Holding", 30, 686.05, "Semiconductors", "Netherlands", "USD"),
+    ("CRDO", "Credo Technology", 15, 72.72, "Semiconductors", "US", "USD"),
+    ("CRWV", "CrowdStrike Holdings", 350, 136.74, "Cybersecurity", "US", "USD"),
+    ("DUOL", "Duolingo", 290, 252.27, "EdTech", "US", "USD"),
+    ("HOOD", "Robinhood Markets", 150, 142.93, "Fintech", "US", "USD"),
+    ("IBIT", "iShares Bitcoin Trust", 238, 67.18, "Crypto ETF", "US", "USD"),
+    ("META", "Meta Platforms", 100, 589.83, "Tech - Social", "US", "USD"),
+    ("MU", "Micron Technology", 100, 416.59, "Semiconductors", "US", "USD"),
+    ("NUTX", "Nutex Health", 250, 95.75, "Healthcare", "US", "USD"),
+    ("NVDA", "NVIDIA Corporation", 200, 120.36, "Semiconductors", "US", "USD"),
+    ("QQQ", "Invesco QQQ Trust", 120, 594.89, "ETF - Nasdaq", "US", "USD"),
+    ("TMDX", "TransMedics Group", 150, 142.35, "Healthcare", "US", "USD"),
+    ("BABA", "Alibaba Group", 150, 160.48, "Tech - eCommerce", "China", "USD"),
+    ("BAC", "Bank of America", 88, 29.60, "Banking", "US", "USD"),
+    ("CRM", "Salesforce", 15, 178.99, "Tech - SaaS", "US", "USD"),
+    ("FIG", "Simplify Exchange Traded Funds", 650, 49.80, "ETF - Alt", "US", "USD"),
+    ("GS", "Goldman Sachs", 13, 342.60, "Banking", "US", "USD"),
+    ("JPM", "JPMorgan Chase", 80, 130.53, "Banking", "US", "USD"),
+    ("RBRK", "Rubrik", 245, 81.91, "Cybersecurity", "US", "USD"),
+    ("RDDT", "Reddit", 150, 209.97, "Tech - Social", "US", "USD"),
+    ("TOST", "Toast", 800, 35.30, "Fintech", "US", "USD"),
+    ("MC.PA", "LVMH Moet Hennessy", 60, 806.37, "Luxury", "France", "EUR"),
 ]
 
 
@@ -86,6 +88,7 @@ def seed():
         ("sector", "''"),
         ("country", "''"),
         ("portfolio_name", "''"),
+        ("currency", "'USD'"),
     ]:
         try:
             conn.execute(f"ALTER TABLE holdings ADD COLUMN {col} TEXT DEFAULT {default}")
@@ -95,15 +98,16 @@ def seed():
     # Clear existing holdings (fresh seed)
     conn.execute("DELETE FROM holdings")
 
-    for ticker, name, shares, avg_cost, sector, country in HOLDINGS:
+    for ticker, name, shares, avg_cost, sector, country, currency in HOLDINGS:
         total_invested = shares * avg_cost
         conn.execute(
             """INSERT OR REPLACE INTO holdings
-               (ticker, name, exchange, quantity, avg_cost, total_invested, sector, country, portfolio_name)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (ticker, name, "", shares, avg_cost, total_invested, sector, country, PORTFOLIO_NAME),
+               (ticker, name, exchange, quantity, avg_cost, total_invested, sector, country, portfolio_name, currency)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (ticker, name, "", shares, avg_cost, total_invested, sector, country, PORTFOLIO_NAME, currency),
         )
-        print(f"  Seeded {ticker:8s} — {shares:>5d} shares @ ${avg_cost:.2f} = ${total_invested:>10,.2f}  [{sector}]")
+        sym = "€" if currency == "EUR" else "$"
+        print(f"  Seeded {ticker:8s} — {shares:>5d} shares @ {sym}{avg_cost:.2f} = {sym}{total_invested:>10,.2f}  [{sector}]")
 
     conn.commit()
 

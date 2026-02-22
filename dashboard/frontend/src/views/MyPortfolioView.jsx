@@ -476,8 +476,14 @@ export default function MyPortfolioView({ onSelectTicker }) {
                         <td className="py-2 pr-2 font-mono font-semibold">{h.ticker}</td>
                         <td className="py-2 pr-2 text-[#8b8d97] max-w-[140px] truncate">{h.quote_name || h.name}</td>
                         <td className="py-2 pr-2 text-right font-mono">{locked ? maskNum(true) : h.quantity.toLocaleString()}</td>
-                        <td className="py-2 pr-2 text-right font-mono">{locked ? mask(true) : `$${fmt(h.avg_cost)}`}</td>
-                        <td className="py-2 pr-2 text-right font-mono">{h.current_price ? `$${fmt(h.current_price)}` : '—'}</td>
+                        <td className="py-2 pr-2 text-right font-mono">
+                          {locked ? mask(true) : `$${fmt(h.avg_cost_usd || h.avg_cost)}`}
+                          {h.currency === 'EUR' && <span className="text-[9px] text-[#8b8d97] ml-0.5">EUR</span>}
+                        </td>
+                        <td className="py-2 pr-2 text-right font-mono">
+                          {h.current_price_usd ? `$${fmt(h.current_price_usd)}` : h.current_price ? `$${fmt(h.current_price)}` : '—'}
+                          {h.currency === 'EUR' && <span className="text-[9px] text-[#8b8d97] ml-0.5">EUR</span>}
+                        </td>
                         <td className={`py-2 pr-2 text-right font-mono ${(h.change_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                           {fmtPct(h.change_pct)}
                         </td>
