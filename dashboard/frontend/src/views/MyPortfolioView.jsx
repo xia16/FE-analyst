@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import {
   useHoldings, useTradeHistory, useAllocation, usePerformance, useBenchmark, useMovers,
 } from '../hooks'
@@ -7,6 +7,59 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell, PieChart, Pie, LineChart, Line, Legend,
 } from 'recharts'
+
+// ─── Custom chart components ────────────────────────────────
+
+const ChartTooltip = ({ children }) => (
+  <div className="bg-[#1a1d2e] border border-[#3b82f6]/30 rounded-lg px-3 py-2 shadow-xl shadow-black/40 text-xs">
+    {children}
+  </div>
+)
+
+const PieTooltipContent = ({ active, payload }) => {
+  if (!active || !payload?.[0]) return null
+  const d = payload[0].payload
+  return (
+    <ChartTooltip>
+      <div className="flex items-center gap-2 mb-1">
+        <div className="w-2.5 h-2.5 rounded-full" style={{ background: payload[0].payload.fill || payload[0].color }} />
+        <span className="font-semibold text-white">{d.name}</span>
+      </div>
+      <div className="text-[#8b8d97]">
+        {fmtCurrency(d.value)} &middot; <span className="text-white font-medium">{d.pct}%</span>
+      </div>
+    </ChartTooltip>
+  )
+}
+
+const BarTooltipContent = ({ active, payload, label, valuePrefix = '$', valueSuffix = '' }) => {
+  if (!active || !payload?.[0]) return null
+  const v = payload[0].value
+  const isPos = v >= 0
+  return (
+    <ChartTooltip>
+      <div className="font-mono font-semibold text-white mb-0.5">{label}</div>
+      <div className={isPos ? 'text-green-400' : 'text-red-400'}>
+        {isPos ? '+' : ''}{valuePrefix}{Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}{valueSuffix}
+      </div>
+    </ChartTooltip>
+  )
+}
+
+// Custom pie label that only shows for slices > threshold
+const renderPieLabel = ({ name, pct, cx, cy, midAngle, innerRadius, outerRadius }) => {
+  if (pct < 4) return null // skip labels for small slices
+  const RADIAN = Math.PI / 180
+  const radius = outerRadius + 18
+  const x = cx + radius * Math.cos(-midAngle * RADIAN)
+  const y = cy + radius * Math.sin(-midAngle * RADIAN)
+  return (
+    <text x={x} y={y} fill="#e4e5e7" fontSize={10} fontWeight={600}
+      textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
+      {name.length > 12 ? name.split(' ')[0] : name} {pct}%
+    </text>
+  )
+}
 
 // SHA-256 hash of the unlock password
 const UNLOCK_HASH = '4a1fbc000b185c7646f9ecce96ac62cc65797b9472a82893b668d7a86408574b'
@@ -417,8 +470,8 @@ export default function MyPortfolioView({ onSelectTicker }) {
             onClick={() => setActiveTab(tab.id)}
             className={`px-4 py-2 text-xs font-medium rounded-t-lg transition-colors ${
               activeTab === tab.id
-                ? 'bg-[#1e2130] text-white border-b-2 border-[#3b82f6]'
-                : 'text-[#8b8d97] hover:text-white'
+                ? 'bg-[#3b82f6]/10 text-white border-b-2 border-[#3b82f6]'
+                : 'text-[#8b8d97] hover:text-white hover:bg-[#1e2130]'
             }`}
           >
             {tab.label}
@@ -440,7 +493,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
             ) : (
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-[#8b8d97] border-b border-[#2a2d3e]">
+                  <tr className="text-[#a0a2ab] border-b border-[#2a2d3e] bg-[#0f1117]/40 text-[10px] uppercase tracking-wider">
                     {[
                       { key: 'ticker', label: 'Ticker', align: 'left' },
                       { key: 'name', label: 'Name', align: 'left' },
@@ -455,11 +508,11 @@ export default function MyPortfolioView({ onSelectTicker }) {
                     ].map(col => (
                       <th
                         key={col.key}
-                        className={`py-2 pr-2 cursor-pointer hover:text-white transition-colors select-none ${col.align === 'right' ? 'text-right' : 'text-left'}`}
+                        className={`py-2.5 pr-2 cursor-pointer hover:text-white transition-colors select-none font-semibold ${col.align === 'right' ? 'text-right' : 'text-left'}`}
                         onClick={() => col.key !== 'name' && col.key !== 'weight' && handleSort(col.key)}
                       >
                         {col.label}
-                        {sortCol === col.key && <span className="ml-0.5">{sortDir === 'desc' ? '\u25BC' : '\u25B2'}</span>}
+                        {sortCol === col.key && <span className="ml-0.5 text-[#3b82f6]">{sortDir === 'desc' ? '\u25BC' : '\u25B2'}</span>}
                       </th>
                     ))}
                   </tr>
@@ -499,11 +552,11 @@ export default function MyPortfolioView({ onSelectTicker }) {
                             <div className="w-12 h-1.5 bg-[#0f1117] rounded-full overflow-hidden">
                               <div className="h-full bg-[#3b82f6] rounded-full" style={{ width: `${Math.min(100, weight)}%` }} />
                             </div>
-                            <span className="text-[10px] font-mono text-[#8b8d97] w-8 text-right">{weight.toFixed(1)}%</span>
+                            <span className="text-[10px] font-mono text-white w-8 text-right">{weight.toFixed(1)}%</span>
                           </div>
                         </td>
                         <td className="py-2 pl-2">
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center gap-1 opacity-30 group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={(e) => { e.stopPropagation(); openAdjust(h) }}
                               className="p-1 rounded hover:bg-[#0f1117] text-[#8b8d97] hover:text-[#3b82f6]"
@@ -536,86 +589,91 @@ export default function MyPortfolioView({ onSelectTicker }) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <h3 className="text-sm font-semibold mb-4">Sector Allocation</h3>
-              {sectors.length > 0 ? (
-                <>
-                  <ResponsiveContainer width="100%" height={240}>
-                    <PieChart>
-                      <Pie
-                        data={sectors}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={90}
-                        dataKey="value"
-                        nameKey="name"
-                        label={locked ? false : ({ name, pct }) => `${name.split(' ')[0]} ${pct}%`}
-                        labelLine={!locked}
-                      >
-                        {sectors.map((s, i) => (
-                          <Cell key={s.name} fill={SECTOR_COLORS[i % SECTOR_COLORS.length]} stroke="none" />
-                        ))}
-                      </Pie>
-                      {!locked && (
-                        <Tooltip
-                          contentStyle={{ background: '#1e2130', border: '1px solid #2a2d3e', borderRadius: 8, fontSize: 11 }}
-                          formatter={(v) => [fmtCurrency(v), 'Value']}
-                        />
-                      )}
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 justify-center">
-                    {sectors.map((s, i) => (
-                      <div key={s.name} className="flex items-center gap-1 text-[10px]">
-                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: SECTOR_COLORS[i % SECTOR_COLORS.length] }} />
-                        <span className="text-[#8b8d97]">{s.name}</span>
-                        <span className="font-semibold">{s.pct}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : <div className="text-center py-8 text-[#8b8d97] text-xs">No allocation data</div>}
+              {sectors.length > 0 ? (() => {
+                // Group small sectors (<2%) into "Other"
+                const major = sectors.filter(s => s.pct >= 2)
+                const minor = sectors.filter(s => s.pct < 2)
+                const grouped = minor.length > 0
+                  ? [...major, { name: 'Other', value: minor.reduce((s, m) => s + m.value, 0), pct: minor.reduce((s, m) => s + m.pct, 0) }]
+                  : major
+                return (
+                  <>
+                    <ResponsiveContainer width="100%" height={260}>
+                      <PieChart>
+                        <Pie
+                          data={grouped}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={95}
+                          dataKey="value"
+                          nameKey="name"
+                          label={locked ? false : renderPieLabel}
+                          labelLine={false}
+                          strokeWidth={2}
+                          stroke="#0f1117"
+                        >
+                          {grouped.map((s, i) => (
+                            <Cell key={s.name} fill={s.name === 'Other' ? '#4b5563' : SECTOR_COLORS[i % SECTOR_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={locked ? () => null : <PieTooltipContent />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-3 justify-center">
+                      {grouped.map((s, i) => (
+                        <div key={s.name} className="flex items-center gap-1.5 text-[10px]">
+                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.name === 'Other' ? '#4b5563' : SECTOR_COLORS[i % SECTOR_COLORS.length] }} />
+                          <span className="text-[#8b8d97]">{s.name}</span>
+                          <span className="font-semibold text-white">{s.pct}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )
+              })() : <div className="text-center py-8 text-[#8b8d97] text-xs">No allocation data</div>}
             </Card>
 
             <Card>
               <h3 className="text-sm font-semibold mb-4">Country Allocation</h3>
-              {countries.length > 0 ? (
-                <>
-                  <ResponsiveContainer width="100%" height={240}>
-                    <PieChart>
-                      <Pie
-                        data={countries}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={90}
-                        dataKey="value"
-                        nameKey="name"
-                        label={locked ? false : ({ name, pct }) => `${name} ${pct}%`}
-                        labelLine={!locked}
-                      >
-                        {countries.map((c, i) => (
-                          <Cell key={c.name} fill={SECTOR_COLORS[(i + 3) % SECTOR_COLORS.length]} stroke="none" />
-                        ))}
-                      </Pie>
-                      {!locked && (
-                        <Tooltip
-                          contentStyle={{ background: '#1e2130', border: '1px solid #2a2d3e', borderRadius: 8, fontSize: 11 }}
-                          formatter={(v) => [fmtCurrency(v), 'Value']}
-                        />
-                      )}
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 justify-center">
-                    {countries.map((c, i) => (
-                      <div key={c.name} className="flex items-center gap-1 text-[10px]">
-                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: SECTOR_COLORS[(i + 3) % SECTOR_COLORS.length] }} />
-                        <span className="text-[#8b8d97]">{c.name}</span>
-                        <span className="font-semibold">{c.pct}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : <div className="text-center py-8 text-[#8b8d97] text-xs">No allocation data</div>}
+              {countries.length > 0 ? (() => {
+                const COUNTRY_COLORS = ['#eab308', '#06b6d4', '#ec4899', '#a855f7', '#22c55e', '#f97316']
+                return (
+                  <>
+                    <ResponsiveContainer width="100%" height={260}>
+                      <PieChart>
+                        <Pie
+                          data={countries}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={95}
+                          dataKey="value"
+                          nameKey="name"
+                          label={locked ? false : renderPieLabel}
+                          labelLine={false}
+                          strokeWidth={2}
+                          stroke="#0f1117"
+                        >
+                          {countries.map((c, i) => (
+                            <Cell key={c.name} fill={COUNTRY_COLORS[i % COUNTRY_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={locked ? () => null : <PieTooltipContent />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 justify-center">
+                      {countries.map((c, i) => (
+                        <div key={c.name} className="flex items-center gap-1.5 text-[10px]">
+                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: COUNTRY_COLORS[i % COUNTRY_COLORS.length] }} />
+                          <span className="text-[#8b8d97]">{c.name}</span>
+                          <span className="font-semibold text-white">{c.pct}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )
+              })() : <div className="text-center py-8 text-[#8b8d97] text-xs">No allocation data</div>}
             </Card>
           </div>
 
@@ -670,27 +728,45 @@ export default function MyPortfolioView({ onSelectTicker }) {
           </div>
 
           {/* P&L bar chart */}
-          {!locked && holdings.length > 0 && holdings.some(h => h.unrealized_pnl != null) && (
-            <Card>
-              <h3 className="text-sm font-semibold mb-4">Unrealized P&L by Position</h3>
-              <ResponsiveContainer width="100%" height={Math.max(200, sorted.length * 28)}>
-                <BarChart data={sorted.filter(h => h.unrealized_pnl != null)} layout="vertical" margin={{ left: 60 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2d3e" />
-                  <XAxis type="number" tick={{ fill: '#8b8d97', fontSize: 10 }} tickFormatter={v => `$${v.toLocaleString()}`} />
-                  <YAxis type="category" dataKey="ticker" tick={{ fill: '#e4e5e7', fontSize: 10, fontFamily: 'monospace' }} width={55} />
-                  <Tooltip
-                    contentStyle={{ background: '#1e2130', border: '1px solid #2a2d3e', borderRadius: 8 }}
-                    formatter={(v) => [`$${v.toLocaleString()}`, 'P&L']}
-                  />
-                  <Bar dataKey="unrealized_pnl" radius={[0, 4, 4, 0]}>
-                    {sorted.filter(h => h.unrealized_pnl != null).map((entry) => (
-                      <Cell key={entry.ticker} fill={(entry.unrealized_pnl || 0) >= 0 ? '#22c55e' : '#ef4444'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </Card>
-          )}
+          {!locked && holdings.length > 0 && holdings.some(h => h.unrealized_pnl != null) && (() => {
+            const pnlData = [...holdings]
+              .filter(h => h.unrealized_pnl != null)
+              .sort((a, b) => (b.unrealized_pnl || 0) - (a.unrealized_pnl || 0))
+            return (
+              <Card>
+                <h3 className="text-sm font-semibold mb-4">Unrealized P&L by Position</h3>
+                <ResponsiveContainer width="100%" height={Math.max(240, pnlData.length * 26)}>
+                  <BarChart data={pnlData} layout="vertical" margin={{ left: 55, right: 20 }} barCategoryGap="20%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2a2d3e" horizontal={false} />
+                    <XAxis
+                      type="number"
+                      tick={{ fill: '#8b8d97', fontSize: 10 }}
+                      tickFormatter={v => v === 0 ? '0' : `${v > 0 ? '+' : ''}$${(Math.abs(v) / 1000).toFixed(0)}k`}
+                      axisLine={{ stroke: '#2a2d3e' }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="ticker"
+                      tick={{ fill: '#e4e5e7', fontSize: 10, fontFamily: 'monospace' }}
+                      width={50}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip content={<BarTooltipContent />} cursor={{ fill: '#ffffff08' }} />
+                    <Bar dataKey="unrealized_pnl" radius={[0, 3, 3, 0]} maxBarSize={18}>
+                      {pnlData.map((entry) => (
+                        <Cell
+                          key={entry.ticker}
+                          fill={(entry.unrealized_pnl || 0) >= 0 ? '#22c55e' : '#ef4444'}
+                          fillOpacity={0.85}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            )
+          })()}
         </div>
       )}
 
@@ -892,31 +968,45 @@ export default function MyPortfolioView({ onSelectTicker }) {
           </Card>
 
           {/* Day-by-Day Performance */}
-          {holdings.length > 0 && (
-            <Card>
-              <h3 className="text-sm font-semibold mb-4">Today's Change by Position (%)</h3>
-              <ResponsiveContainer width="100%" height={Math.max(200, sorted.length * 26)}>
-                <BarChart
-                  data={[...holdings].sort((a, b) => (b.change_pct || 0) - (a.change_pct || 0)).filter(h => h.change_pct != null)}
-                  layout="vertical"
-                  margin={{ left: 60 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2d3e" />
-                  <XAxis type="number" tick={{ fill: '#8b8d97', fontSize: 10 }} tickFormatter={v => `${v}%`} />
-                  <YAxis type="category" dataKey="ticker" tick={{ fill: '#e4e5e7', fontSize: 10, fontFamily: 'monospace' }} width={55} />
-                  <Tooltip
-                    contentStyle={{ background: '#1e2130', border: '1px solid #2a2d3e', borderRadius: 8 }}
-                    formatter={(v) => [`${v}%`, 'Change']}
-                  />
-                  <Bar dataKey="change_pct" radius={[0, 4, 4, 0]}>
-                    {[...holdings].sort((a, b) => (b.change_pct || 0) - (a.change_pct || 0)).filter(h => h.change_pct != null).map((entry) => (
-                      <Cell key={entry.ticker} fill={(entry.change_pct || 0) >= 0 ? '#22c55e' : '#ef4444'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </Card>
-          )}
+          {holdings.length > 0 && (() => {
+            const dayData = [...holdings]
+              .filter(h => h.change_pct != null)
+              .sort((a, b) => (b.change_pct || 0) - (a.change_pct || 0))
+            return (
+              <Card>
+                <h3 className="text-sm font-semibold mb-4">Today's Change by Position</h3>
+                <ResponsiveContainer width="100%" height={Math.max(240, dayData.length * 26)}>
+                  <BarChart data={dayData} layout="vertical" margin={{ left: 55, right: 20 }} barCategoryGap="20%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2a2d3e" horizontal={false} />
+                    <XAxis
+                      type="number"
+                      tick={{ fill: '#8b8d97', fontSize: 10 }}
+                      tickFormatter={v => `${v}%`}
+                      axisLine={{ stroke: '#2a2d3e' }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="ticker"
+                      tick={{ fill: '#e4e5e7', fontSize: 10, fontFamily: 'monospace' }}
+                      width={50}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip content={<BarTooltipContent valuePrefix="" valueSuffix="%" />} cursor={{ fill: '#ffffff08' }} />
+                    <Bar dataKey="change_pct" radius={[0, 3, 3, 0]} maxBarSize={18}>
+                      {dayData.map((entry) => (
+                        <Cell
+                          key={entry.ticker}
+                          fill={(entry.change_pct || 0) >= 0 ? '#22c55e' : '#ef4444'}
+                          fillOpacity={0.85}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            )
+          })()}
         </div>
       )}
 

@@ -84,7 +84,7 @@ function WatchlistView({ domainId }) {
                   />
                 ))}
               </Pie>
-              <Tooltip formatter={(v) => `${v}%`} contentStyle={{ background: '#1e2130', border: '1px solid #2a2d3e', borderRadius: 8 }} />
+              <Tooltip formatter={(v) => `${v}%`} contentStyle={{ background: '#1a1d2e', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }} />
             </PieChart>
           </ResponsiveContainer>
           <div className="flex flex-wrap gap-2 mt-2 justify-center">
@@ -101,20 +101,20 @@ function WatchlistView({ domainId }) {
           <h3 className="text-sm font-semibold mb-4">Tracked Positions — Live</h3>
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-[#8b8d97] border-b border-[#2a2d3e]">
-                <th className="text-left py-2 pr-2">Ticker</th>
-                <th className="text-left py-2 pr-2">Name</th>
-                <th className="text-right py-2 pr-2">Price</th>
-                <th className="text-right py-2 pr-2">Change</th>
-                <th className="text-right py-2 pr-2">Mkt Cap</th>
-                <th className="text-right py-2 pr-2">Fwd P/E</th>
-                <th className="text-center py-2 pr-2">Rating</th>
-                <th className="text-right py-2">Alloc</th>
+              <tr className="text-[#a0a2ab] border-b border-[#2a2d3e] bg-[#0f1117]/40 text-[10px] uppercase tracking-wider">
+                <th className="text-left py-2.5 pr-2 font-semibold">Ticker</th>
+                <th className="text-left py-2.5 pr-2 font-semibold">Name</th>
+                <th className="text-right py-2.5 pr-2 font-semibold">Price</th>
+                <th className="text-right py-2.5 pr-2 font-semibold">Change</th>
+                <th className="text-right py-2.5 pr-2 font-semibold">Mkt Cap</th>
+                <th className="text-right py-2.5 pr-2 font-semibold">Fwd P/E</th>
+                <th className="text-center py-2.5 pr-2 font-semibold">Rating</th>
+                <th className="text-right py-2.5 font-semibold">Alloc</th>
               </tr>
             </thead>
             <tbody>
               {sorted.map(p => (
-                <tr key={p.ticker} className="border-b border-[#2a2d3e]/50 hover:bg-[#252940] transition-colors">
+                <tr key={p.ticker} className="border-b border-[#2a2d3e]/50 hover:bg-[#1a1f2e] transition-colors">
                   <td className="py-2 pr-2 font-mono font-semibold">{p.ticker}</td>
                   <td className="py-2 pr-2 text-[#8b8d97] max-w-[160px] truncate">{p.name}</td>
                   <td className="py-2 pr-2 text-right font-mono">{fmt(p.price)}</td>
@@ -137,19 +137,20 @@ function WatchlistView({ domainId }) {
       </div>
 
       <Card>
-        <h3 className="text-sm font-semibold mb-4">Today's Performance (%)</h3>
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={sorted} layout="vertical" margin={{ left: 60 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2a2d3e" />
-            <XAxis type="number" tick={{ fill: '#8b8d97', fontSize: 10 }} tickFormatter={v => `${v}%`} />
-            <YAxis type="category" dataKey="ticker" tick={{ fill: '#e4e5e7', fontSize: 10, fontFamily: 'monospace' }} width={55} />
+        <h3 className="text-sm font-semibold mb-4">Today's Performance</h3>
+        <ResponsiveContainer width="100%" height={Math.max(240, sorted.length * 26)}>
+          <BarChart data={sorted} layout="vertical" margin={{ left: 55, right: 20 }} barCategoryGap="20%">
+            <CartesianGrid strokeDasharray="3 3" stroke="#2a2d3e" horizontal={false} />
+            <XAxis type="number" tick={{ fill: '#8b8d97', fontSize: 10 }} tickFormatter={v => `${v}%`} axisLine={{ stroke: '#2a2d3e' }} />
+            <YAxis type="category" dataKey="ticker" tick={{ fill: '#e4e5e7', fontSize: 10, fontFamily: 'monospace' }} width={50} axisLine={false} tickLine={false} />
             <Tooltip
-              contentStyle={{ background: '#1e2130', border: '1px solid #2a2d3e', borderRadius: 8 }}
+              contentStyle={{ background: '#1a1d2e', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}
               formatter={(v) => [`${v}%`, 'Change']}
+              cursor={{ fill: 'rgba(255,255,255,0.03)' }}
             />
-            <Bar dataKey="changePct" radius={[0, 4, 4, 0]}>
+            <Bar dataKey="changePct" radius={[0, 3, 3, 0]} maxBarSize={18}>
               {sorted.map((entry) => (
-                <Cell key={entry.ticker} fill={(entry.changePct || 0) >= 0 ? '#22c55e' : '#ef4444'} />
+                <Cell key={entry.ticker} fill={(entry.changePct || 0) >= 0 ? '#22c55e' : '#ef4444'} fillOpacity={0.85} />
               ))}
             </Bar>
           </BarChart>
@@ -348,7 +349,7 @@ function HeatmapView({ domainId, domainMeta, onSelectTicker }) {
               />
             ))}
             <Legend wrapperStyle={{ fontSize: 10 }} />
-            <Tooltip contentStyle={{ background: '#1e2130', border: '1px solid #2a2d3e', borderRadius: 8, fontSize: 11 }} />
+            <Tooltip contentStyle={{ background: '#1a1d2e', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, fontSize: 11, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }} />
           </RadarChart>
         </ResponsiveContainer>
       </Card>
@@ -357,23 +358,23 @@ function HeatmapView({ domainId, domainMeta, onSelectTicker }) {
         <h3 className="text-sm font-semibold mb-4">Full Heatmap — {heatmapData.length} Companies</h3>
         <table className="w-full text-xs">
           <thead>
-            <tr className="text-[#8b8d97] border-b border-[#2a2d3e]">
-              <th className="text-left py-2 pr-2">#</th>
-              <th className="text-left py-2 pr-2">Ticker</th>
-              <th className="text-left py-2 pr-2">Name</th>
-              <th className="text-center py-2 pr-2">Tier</th>
-              <th className="text-center py-2 pr-2">Category</th>
+            <tr className="text-[#a0a2ab] border-b border-[#2a2d3e] bg-[#0f1117]/40 text-[10px] uppercase tracking-wider">
+              <th className="text-left py-2.5 pr-2 font-semibold">#</th>
+              <th className="text-left py-2.5 pr-2 font-semibold">Ticker</th>
+              <th className="text-left py-2.5 pr-2 font-semibold">Name</th>
+              <th className="text-center py-2.5 pr-2 font-semibold">Tier</th>
+              <th className="text-center py-2.5 pr-2 font-semibold">Category</th>
               {dimKeys.map(d => (
-                <th key={d} className="text-center py-2 px-1">{dimLabels[d]}</th>
+                <th key={d} className="text-center py-2.5 px-1 font-semibold">{dimLabels[d]}</th>
               ))}
-              <th className="text-center py-2 pl-2 font-bold">Composite</th>
+              <th className="text-center py-2.5 pl-2 font-bold">Composite</th>
             </tr>
           </thead>
           <tbody>
             {heatmapData.map((c, i) => (
               <tr
                 key={c.ticker}
-                className="border-b border-[#2a2d3e]/30 hover:bg-[#252940] transition-colors cursor-pointer"
+                className="border-b border-[#2a2d3e]/30 hover:bg-[#1a1f2e] transition-colors cursor-pointer"
                 onClick={() => onSelectTicker(c.ticker)}
               >
                 <td className="py-1.5 pr-2 text-[#8b8d97]">{i + 1}</td>

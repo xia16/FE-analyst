@@ -120,7 +120,7 @@ export default function StockDetailView({ ticker, setTicker }) {
                   />
                   <YAxis tick={{ fill: '#8b8d97', fontSize: 10 }} domain={['auto', 'auto']} />
                   <Tooltip
-                    contentStyle={{ background: '#1e2130', border: '1px solid #2a2d3e', borderRadius: 8, fontSize: 11 }}
+                    contentStyle={{ background: '#1a1d2e', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, fontSize: 11, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}
                     labelFormatter={d => new Date(d).toLocaleDateString()}
                     formatter={(v) => [fmt(v), 'Close']}
                   />
