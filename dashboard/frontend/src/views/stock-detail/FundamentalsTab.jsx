@@ -52,12 +52,102 @@ export default function FundamentalsTab({ analysis }) {
   const capitalAlloc = fund.capital_allocation || {}
   const quarterlyTrends = fund.quarterly_trends || {}
   const sgaEff = fund.sga_efficiency || {}
+  const valueCreation = fund.value_creation || {}
+  const extraVal = fund.extra_valuation || {}
+  const earningsStability = fund.earnings_stability || {}
+  const redFlags = fund.red_flags || {}
+  const conflicts = analysis?.conflicts || {}
 
   const dupont3 = dupont.three_way || {}
   const dupont5 = dupont.five_way || {}
 
   return (
     <div className="space-y-6">
+      {/* Red Flags Banner */}
+      {redFlags.count > 0 && (
+        <Card>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-lg">{redFlags.has_critical ? '\u26A0\uFE0F' : '\u2139\uFE0F'}</span>
+            <h3 className={`text-sm font-semibold ${redFlags.has_critical ? 'text-red-400' : 'text-yellow-400'}`}>
+              {redFlags.count} Red Flag{redFlags.count > 1 ? 's' : ''} Detected
+              {redFlags.high_severity_count > 0 && ` (${redFlags.high_severity_count} critical)`}
+            </h3>
+          </div>
+          <div className="space-y-2">
+            {(redFlags.flags || []).map((f, i) => (
+              <div key={i} className={`flex items-start gap-2 text-xs p-2 rounded ${f.severity === 'HIGH' ? 'bg-red-500/10 border border-red-500/20' : f.severity === 'MEDIUM' ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-[#0f1117]'}`}>
+                <Badge color={f.severity === 'HIGH' ? '#ef4444' : f.severity === 'MEDIUM' ? '#eab308' : '#6b7280'}>{f.severity}</Badge>
+                <div>
+                  <span className="font-medium">{f.flag}</span>
+                  <span className="text-[#8b8d97] ml-1">{f.detail}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Cross-Analyzer Conflicts */}
+      {conflicts.count > 0 && (
+        <Card>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-lg">{'\u26A1'}</span>
+            <h3 className="text-sm font-semibold text-orange-400">
+              {conflicts.count} Signal Conflict{conflicts.count > 1 ? 's' : ''}
+            </h3>
+          </div>
+          <div className="space-y-2">
+            {(conflicts.conflicts || []).map((c, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs p-2 rounded bg-orange-500/10 border border-orange-500/20">
+                <Badge color={c.severity === 'HIGH' ? '#f97316' : '#eab308'}>{c.severity}</Badge>
+                <span className="text-[#c8c9ce]">{c.detail}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Value Creation + Extra Metrics Row */}
+      {(valueCreation.spread != null || extraVal.fcf_yield != null || earningsStability.cv != null) && (
+        <Card>
+          <h3 className="text-sm font-semibold mb-3">Key Quality Metrics</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+            {valueCreation.spread != null && (
+              <div>
+                <div className="text-[#8b8d97]">ROIC - WACC Spread</div>
+                <div className={`font-bold font-mono text-lg ${valueCreation.creating_value ? 'text-green-400' : 'text-red-400'}`}>
+                  {(valueCreation.spread * 100).toFixed(1)}%
+                </div>
+                <div className="text-[9px] text-[#8b8d97] mt-1">{valueCreation.assessment}</div>
+              </div>
+            )}
+            {extraVal.fcf_yield != null && (
+              <div>
+                <div className="text-[#8b8d97]">FCF Yield</div>
+                <div className={`font-bold font-mono text-lg ${extraVal.fcf_yield > 0.05 ? 'text-green-400' : extraVal.fcf_yield > 0.02 ? 'text-yellow-400' : 'text-red-400'}`}>
+                  {(extraVal.fcf_yield * 100).toFixed(1)}%
+                </div>
+              </div>
+            )}
+            {extraVal.ev_fcf != null && (
+              <div>
+                <div className="text-[#8b8d97]">EV/FCF</div>
+                <div className="font-bold font-mono text-lg">{extraVal.ev_fcf.toFixed(1)}x</div>
+              </div>
+            )}
+            {earningsStability.cv != null && (
+              <div>
+                <div className="text-[#8b8d97]">Earnings Stability</div>
+                <div className={`font-bold font-mono text-lg ${earningsStability.score >= 2 ? 'text-green-400' : earningsStability.score >= 1 ? 'text-yellow-400' : 'text-red-400'}`}>
+                  {earningsStability.score}/{earningsStability.max_score}
+                </div>
+                <div className="text-[9px] text-[#8b8d97] mt-1">{earningsStability.stability}</div>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
       {/* Subscores */}
       <Card>
         <h3 className="text-sm font-semibold mb-4">Fundamental Subscores</h3>

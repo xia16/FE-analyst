@@ -188,6 +188,13 @@ class StockScorer:
         # Conviction meta-score
         conviction = self._compute_conviction(scores, details)
 
+        # Cross-analyzer conflict detection
+        conflicts = self._detect_conflicts(scores, details)
+
+        # Red flags from fundamentals
+        fund_detail = details.get("fundamental", {})
+        red_flags = fund_detail.get("red_flags", {})
+
         return {
             "ticker": ticker,
             "composite_score": round(composite, 1),
@@ -195,7 +202,77 @@ class StockScorer:
             "component_scores": {k: round(v, 1) for k, v in scores.items()},
             "weights": self.WEIGHTS,
             "conviction": conviction,
+            "conflicts": conflicts,
+            "red_flags": red_flags,
             "details": details,
+        }
+
+    @staticmethod
+    def _detect_conflicts(scores: dict, details: dict) -> dict:
+        """Detect cross-analyzer conflicts that should flag for review.
+
+        Looks for situations where different analysis dimensions
+        strongly disagree, which lowers the reliability of the composite.
+        """
+        conflicts: list[dict] = []
+
+        fund_score = scores.get("fundamental", 50)
+        val_score = scores.get("valuation", 50)
+        tech_score = scores.get("technical", 50)
+        sent_score = scores.get("sentiment", 50)
+        risk_score = scores.get("risk", 50)
+
+        # 1. Technical BUY but DCF says overvalued
+        if tech_score > 65 and val_score < 35:
+            conflicts.append({
+                "type": "technical_vs_valuation",
+                "severity": "HIGH",
+                "detail": f"Technical signals bullish ({tech_score:.0f}) but valuation bearish ({val_score:.0f}) — momentum may not be justified by fundamentals",
+            })
+
+        # 2. DCF undervalued but technical SELL (falling knife)
+        if val_score > 65 and tech_score < 35:
+            conflicts.append({
+                "type": "valuation_vs_technical",
+                "severity": "HIGH",
+                "detail": f"Valuation attractive ({val_score:.0f}) but technicals bearish ({tech_score:.0f}) — potential value trap / falling knife",
+            })
+
+        # 3. Strong fundamentals but bearish sentiment
+        if fund_score > 65 and sent_score < 35:
+            conflicts.append({
+                "type": "fundamental_vs_sentiment",
+                "severity": "MEDIUM",
+                "detail": f"Fundamentals strong ({fund_score:.0f}) but sentiment bearish ({sent_score:.0f}) — contrarian opportunity or market knows something",
+            })
+
+        # 4. High risk but bullish everything else
+        avg_other = (fund_score + val_score + tech_score) / 3
+        if risk_score < 30 and avg_other > 60:
+            conflicts.append({
+                "type": "risk_vs_opportunity",
+                "severity": "MEDIUM",
+                "detail": f"Bullish signals (avg {avg_other:.0f}) but high risk ({risk_score:.0f}) — size positions accordingly",
+            })
+
+        # 5. Insider selling while analyst targets high
+        sent_detail = details.get("sentiment", {})
+        insider_trades = sent_detail.get("raw_data", {}).get("insider_trades", [])
+        analyst_targets = sent_detail.get("analyst_targets", {})
+        if insider_trades:
+            net_insider = sum(t.get("change", 0) for t in insider_trades[:10])
+            upside = analyst_targets.get("upside_pct", 0)
+            if net_insider < 0 and upside and upside > 20:
+                conflicts.append({
+                    "type": "insider_vs_analyst",
+                    "severity": "MEDIUM",
+                    "detail": f"Insiders net selling while analysts see {upside:.0f}% upside — insiders may have better information",
+                })
+
+        return {
+            "conflicts": conflicts,
+            "count": len(conflicts),
+            "has_high_severity": any(c["severity"] == "HIGH" for c in conflicts),
         }
 
     @staticmethod

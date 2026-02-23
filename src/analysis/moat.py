@@ -50,7 +50,13 @@ class MoatAnalyzer:
         # --- Quantitative: Pricing Power (from financials) ---
         scores["pricing_power"] = self._score_pricing_power(ticker)
 
-        # --- Qualitative scores (from overrides or defaults) ---
+        # --- Quantitative: Barriers to Entry (R&D + capex intensity) ---
+        barriers_quant = self._score_barriers_quantitative(ticker)
+
+        # --- Quantitative: Switching Costs proxy (revenue stability + customer stickiness) ---
+        switching_quant = self._score_switching_costs_quantitative(ticker)
+
+        # --- Qualitative scores (from overrides or quantitative estimates) ---
         for dim in [
             "market_dominance",
             "switching_costs",
@@ -58,7 +64,14 @@ class MoatAnalyzer:
             "supply_chain_criticality",
             "barriers_to_entry",
         ]:
-            scores[dim] = overrides.get(dim, 50)  # default neutral if not provided
+            if dim in overrides:
+                scores[dim] = overrides[dim]
+            elif dim == "barriers_to_entry":
+                scores[dim] = barriers_quant
+            elif dim == "switching_costs":
+                scores[dim] = switching_quant
+            else:
+                scores[dim] = 50  # default neutral if not provided
 
         # Weighted composite
         composite = sum(
@@ -126,6 +139,100 @@ class MoatAnalyzer:
             return min(100, max(0, score))
         except Exception as e:
             logger.warning("Pricing power score failed for %s: %s", ticker, e)
+            return 50.0
+
+    def _score_barriers_quantitative(self, ticker: str) -> float:
+        """Score barriers to entry from R&D intensity + capex requirements."""
+        try:
+            income = self.fundamentals.get_income_statement(ticker)
+            cashflow = self.fundamentals.get_cash_flow(ticker)
+
+            score = 50.0
+
+            if not income.empty:
+                revenue = None
+                rd = None
+                if "Total Revenue" in income.index:
+                    revenue = income.loc["Total Revenue"].iloc[0]
+                    if pd.notna(revenue):
+                        revenue = float(revenue)
+                if "Research And Development" in income.index:
+                    rd = income.loc["Research And Development"].iloc[0]
+                    if pd.notna(rd):
+                        rd = float(rd)
+
+                # High R&D intensity = high barriers (competitors can't easily replicate)
+                if rd and revenue and revenue > 0:
+                    rd_pct = rd / revenue
+                    if rd_pct > 0.20:
+                        score += 25  # Very high R&D (pharma, deep tech)
+                    elif rd_pct > 0.10:
+                        score += 15  # High R&D (semis, software)
+                    elif rd_pct > 0.05:
+                        score += 5
+
+            if not cashflow.empty and "Capital Expenditure" in cashflow.index:
+                capex = cashflow.loc["Capital Expenditure"].iloc[0]
+                if pd.notna(capex):
+                    capex = abs(float(capex))
+                    # Large absolute capex = capital-intensive = harder to enter
+                    if capex > 10e9:
+                        score += 15  # >$10B capex (fabs, data centers)
+                    elif capex > 3e9:
+                        score += 10
+                    elif capex > 1e9:
+                        score += 5
+
+            return min(100, max(0, score))
+        except Exception as e:
+            logger.warning("Barriers quantitative score failed for %s: %s", ticker, e)
+            return 50.0
+
+    def _score_switching_costs_quantitative(self, ticker: str) -> float:
+        """Score switching costs proxy from revenue stability + gross margin."""
+        try:
+            income = self.fundamentals.get_income_statement(ticker)
+            score = 50.0
+
+            if income.empty or "Total Revenue" not in income.index:
+                return score
+
+            rev_row = income.loc["Total Revenue"].dropna()
+            revenues = [float(v) for v in rev_row if pd.notna(v)]
+
+            if len(revenues) < 3:
+                return score
+
+            # Revenue stability (low variance = sticky customers)
+            mean_rev = np.mean(revenues)
+            if mean_rev > 0:
+                cv = np.std(revenues) / mean_rev
+                if cv < 0.10:
+                    score += 20  # Very stable (enterprise software, utilities)
+                elif cv < 0.20:
+                    score += 10  # Stable
+                elif cv > 0.40:
+                    score -= 10  # Volatile (cyclical, low switching costs)
+
+            # Consistent revenue growth = customers keep coming back
+            all_growing = all(revenues[i] >= revenues[i + 1] * 0.95 for i in range(len(revenues) - 1))
+            if all_growing:
+                score += 10
+
+            # High gross margins = pricing power = customers can't easily switch
+            if "Gross Profit" in income.index:
+                gp = income.loc["Gross Profit"].iloc[0]
+                rev = income.loc["Total Revenue"].iloc[0]
+                if pd.notna(gp) and pd.notna(rev) and float(rev) > 0:
+                    gm = float(gp) / float(rev)
+                    if gm > 0.60:
+                        score += 15  # Software-like margins
+                    elif gm > 0.40:
+                        score += 5
+
+            return min(100, max(0, score))
+        except Exception as e:
+            logger.warning("Switching costs quantitative score failed for %s: %s", ticker, e)
             return 50.0
 
     def compare_moats(self, companies: list[dict]) -> pd.DataFrame:

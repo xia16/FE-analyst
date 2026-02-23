@@ -104,6 +104,21 @@ class FundamentalAnalyzer:
         quarterly_trends = self._calc_quarterly_trends(income_q)
         sga_eff = self._calc_sga_efficiency(income_a)
 
+        # --- Value creation check: ROIC vs WACC ---
+        value_creation = self._calc_value_creation(roic, info)
+
+        # --- Additional valuation metrics: PEG, FCF yield ---
+        extra_valuation = self._calc_extra_valuation(ratios, cashflow, info)
+
+        # --- Earnings stability (coefficient of variation) ---
+        earnings_stability = self._calc_earnings_stability(income_a)
+
+        # --- Fundamental red flags / deterioration detection ---
+        red_flags = self._detect_red_flags(
+            income_a, balance, cashflow, ratios, info,
+            roic, quarterly_trends, earnings_quality,
+        )
+
         return {
             "ticker": ticker,
             "company": profile.get("name"),
@@ -113,6 +128,7 @@ class FundamentalAnalyzer:
             "valuation": valuation,
             "ratios": ratios,
             "roic": roic,
+            "value_creation": value_creation,
             "piotroski": piotroski,
             "dupont": dupont,
             "earnings_quality": earnings_quality,
@@ -120,6 +136,9 @@ class FundamentalAnalyzer:
             "capital_allocation": capital_alloc,
             "quarterly_trends": quarterly_trends,
             "sga_efficiency": sga_eff,
+            "extra_valuation": extra_valuation,
+            "earnings_stability": earnings_stability,
+            "red_flags": red_flags,
         }
 
     # ------------------------------------------------------------------
@@ -803,6 +822,255 @@ class FundamentalAnalyzer:
             logger.warning("SG&A efficiency calc failed: %s", exc)
 
         return result
+
+
+    # ------------------------------------------------------------------
+    # 9. ROIC vs WACC — Value Creation Check
+    # ------------------------------------------------------------------
+    def _calc_value_creation(self, roic: dict, info: dict) -> dict:
+        """Check whether ROIC exceeds WACC (economic value creation)."""
+        result = {"roic": None, "wacc_estimate": None, "spread": None,
+                  "creating_value": None, "assessment": "N/A"}
+        try:
+            roic_val = roic.get("value")
+            if roic_val is None:
+                return result
+
+            # Estimate WACC from info (cost of equity approximation)
+            beta = info.get("beta", 1.0) or 1.0
+            risk_free = 0.043  # approximate 10Y Treasury
+            erp = 0.06
+            cost_of_equity = risk_free + beta * erp
+
+            # Approximate WACC with 80/20 equity/debt assumption
+            wacc_est = cost_of_equity * 0.85 + 0.05 * 0.15  # simplified
+            spread = roic_val - wacc_est
+
+            result["roic"] = round(roic_val, 4)
+            result["wacc_estimate"] = round(wacc_est, 4)
+            result["spread"] = round(spread, 4)
+            result["creating_value"] = spread > 0
+
+            if spread > 0.10:
+                result["assessment"] = f"Exceptional value creator (ROIC-WACC = {spread:.1%})"
+            elif spread > 0.04:
+                result["assessment"] = f"Strong value creator (ROIC-WACC = {spread:.1%})"
+            elif spread > 0:
+                result["assessment"] = f"Marginal value creator (ROIC-WACC = {spread:.1%})"
+            else:
+                result["assessment"] = f"Value destroyer (ROIC-WACC = {spread:.1%})"
+        except Exception as exc:
+            logger.warning("Value creation calc failed: %s", exc)
+        return result
+
+    # ------------------------------------------------------------------
+    # 10. Extra Valuation Metrics — PEG, FCF Yield
+    # ------------------------------------------------------------------
+    def _calc_extra_valuation(self, ratios: dict, cashflow: pd.DataFrame,
+                               info: dict) -> dict:
+        """Compute PEG ratio and FCF yield."""
+        result = {"peg_ratio": None, "fcf_yield": None, "ev_fcf": None}
+        try:
+            # PEG from ratios (already available from yfinance)
+            peg = ratios.get("peg_ratio")
+            if peg is not None:
+                result["peg_ratio"] = round(peg, 2)
+
+            # FCF yield = FCF / Market Cap
+            market_cap = info.get("marketCap")
+            if not cashflow.empty and market_cap and market_cap > 0:
+                fcf = _safe_get(cashflow, "Free Cash Flow")
+                if fcf is not None:
+                    result["fcf_yield"] = round(fcf / market_cap, 4)
+
+                    # EV/FCF
+                    ev = info.get("enterpriseValue")
+                    if ev and ev > 0 and fcf > 0:
+                        result["ev_fcf"] = round(ev / fcf, 2)
+        except Exception as exc:
+            logger.warning("Extra valuation calc failed: %s", exc)
+        return result
+
+    # ------------------------------------------------------------------
+    # 11. Earnings Stability — CV of Net Income
+    # ------------------------------------------------------------------
+    def _calc_earnings_stability(self, income: pd.DataFrame) -> dict:
+        """Measure earnings predictability via coefficient of variation."""
+        result = {"cv": None, "years": 0, "stability": "N/A",
+                  "score": 0, "max_score": 3}
+        try:
+            if income.empty or "Net Income" not in income.index:
+                return result
+
+            ni_row = income.loc["Net Income"].dropna()
+            ni_vals = [float(v) for v in ni_row if pd.notna(v)]
+
+            if len(ni_vals) < 3:
+                return result
+
+            mean_ni = np.mean(ni_vals)
+            std_ni = np.std(ni_vals)
+
+            if mean_ni == 0:
+                return result
+
+            cv = abs(std_ni / mean_ni)
+            result["cv"] = round(cv, 4)
+            result["years"] = len(ni_vals)
+
+            # All positive = extra stability point
+            all_positive = all(v > 0 for v in ni_vals)
+
+            score = 0
+            if cv < 0.15 and all_positive:
+                score = 3
+                result["stability"] = "Very stable — low variance, consistently profitable"
+            elif cv < 0.30 and all_positive:
+                score = 2
+                result["stability"] = "Stable — moderate variance, consistently profitable"
+            elif cv < 0.50:
+                score = 1
+                result["stability"] = "Moderate — some earnings volatility"
+            else:
+                result["stability"] = "Volatile — high earnings unpredictability"
+
+            result["score"] = score
+
+        except Exception as exc:
+            logger.warning("Earnings stability calc failed: %s", exc)
+        return result
+
+    # ------------------------------------------------------------------
+    # 12. Fundamental Red Flags
+    # ------------------------------------------------------------------
+    def _detect_red_flags(self, income: pd.DataFrame, balance: pd.DataFrame,
+                           cashflow: pd.DataFrame, ratios: dict, info: dict,
+                           roic: dict, quarterly_trends: dict,
+                           earnings_quality: dict) -> dict:
+        """Detect fundamental red flags — deterioration, manipulation risk, distress."""
+        flags: list[dict] = []
+
+        try:
+            # 1. Revenue growing but FCF declining (potential earnings manipulation)
+            if not income.empty and not cashflow.empty and income.shape[1] >= 2:
+                rev_curr = _safe_get(income, "Total Revenue", col=0)
+                rev_prev = _safe_get(income, "Total Revenue", col=1)
+                fcf_curr = _safe_get(cashflow, "Free Cash Flow", col=0)
+                fcf_prev = _safe_get(cashflow, "Free Cash Flow", col=1)
+                if all(v is not None for v in [rev_curr, rev_prev, fcf_curr, fcf_prev]):
+                    if rev_prev > 0 and rev_curr > rev_prev and fcf_curr < fcf_prev:
+                        flags.append({
+                            "flag": "Revenue-FCF divergence",
+                            "severity": "HIGH",
+                            "detail": f"Revenue grew {(rev_curr/rev_prev-1)*100:.1f}% but FCF declined",
+                        })
+
+            # 2. Accruals quality deteriorating (earnings not backed by cash)
+            accruals = earnings_quality.get("accruals_ratio")
+            if accruals is not None and accruals > 0.10:
+                flags.append({
+                    "flag": "High accruals ratio",
+                    "severity": "HIGH",
+                    "detail": f"Accruals ratio {accruals:.1%} — earnings may not be cash-backed",
+                })
+
+            # 3. ROIC trending below WACC
+            roic_val = roic.get("value")
+            if roic_val is not None and roic_val < 0.06:
+                flags.append({
+                    "flag": "Low ROIC",
+                    "severity": "MEDIUM" if roic_val > 0 else "HIGH",
+                    "detail": f"ROIC of {roic_val:.1%} likely below cost of capital",
+                })
+
+            # 4. Leverage spike — debt/equity > 150%
+            de = ratios.get("debt_to_equity")
+            if de is not None and de > 150:
+                flags.append({
+                    "flag": "High leverage",
+                    "severity": "HIGH" if de > 250 else "MEDIUM",
+                    "detail": f"Debt/Equity of {de:.0f}%",
+                })
+
+            # 5. Margin compression — operating margin declining
+            if quarterly_trends.get("margin_trend") == "Contracting":
+                flags.append({
+                    "flag": "Margin compression",
+                    "severity": "MEDIUM",
+                    "detail": "Operating margins contracting over recent quarters",
+                })
+
+            # 6. Cash burn — negative OCF
+            if not cashflow.empty:
+                ocf = _safe_get(cashflow, "Operating Cash Flow", col=0)
+                if ocf is not None and ocf < 0:
+                    flags.append({
+                        "flag": "Negative operating cash flow",
+                        "severity": "HIGH",
+                        "detail": f"OCF = {ocf/1e6:.0f}M — burning cash",
+                    })
+
+            # 7. Share dilution
+            if not income.empty and income.shape[1] >= 2:
+                shares_curr = _safe_get(income, "Diluted Average Shares",
+                                         fallbacks=["Basic Average Shares"], col=0)
+                shares_prev = _safe_get(income, "Diluted Average Shares",
+                                         fallbacks=["Basic Average Shares"], col=1)
+                if shares_curr and shares_prev and shares_prev > 0:
+                    dilution = (shares_curr / shares_prev - 1)
+                    if dilution > 0.03:
+                        flags.append({
+                            "flag": "Share dilution",
+                            "severity": "MEDIUM",
+                            "detail": f"Shares outstanding increased {dilution*100:.1f}% YoY",
+                        })
+
+            # 8. Altman Z-Score distress check (simplified)
+            if not income.empty and not balance.empty:
+                total_assets = _safe_get(balance, "Total Assets")
+                working_cap = None
+                ca = _safe_get(balance, "Current Assets")
+                cl = _safe_get(balance, "Current Liabilities")
+                if ca is not None and cl is not None:
+                    working_cap = ca - cl
+                retained = _safe_get(balance, "Retained Earnings")
+                ebit = _safe_get(income, "Operating Income", fallbacks=["EBIT"])
+                revenue = _safe_get(income, "Total Revenue")
+                market_cap = info.get("marketCap", 0) or 0
+                total_liabilities = _safe_get(balance, "Total Liabilities Net Minority Interest",
+                                               fallbacks=["Total Liabilities"])
+
+                if all(v is not None for v in [total_assets, working_cap, ebit, revenue]) and total_assets > 0:
+                    x1 = working_cap / total_assets
+                    x2 = (retained / total_assets) if retained else 0
+                    x3 = ebit / total_assets
+                    x4 = market_cap / total_liabilities if total_liabilities and total_liabilities > 0 else 1.0
+                    x5 = revenue / total_assets
+
+                    z = 1.2 * x1 + 1.4 * x2 + 3.3 * x3 + 0.6 * x4 + 1.0 * x5
+
+                    if z < 1.81:
+                        flags.append({
+                            "flag": "Altman Z-Score distress zone",
+                            "severity": "HIGH",
+                            "detail": f"Z-Score = {z:.2f} (< 1.81 = distress zone)",
+                        })
+                    elif z < 2.99:
+                        flags.append({
+                            "flag": "Altman Z-Score grey zone",
+                            "severity": "LOW",
+                            "detail": f"Z-Score = {z:.2f} (1.81-2.99 = grey zone)",
+                        })
+
+        except Exception as exc:
+            logger.warning("Red flag detection failed: %s", exc)
+
+        return {
+            "flags": flags,
+            "count": len(flags),
+            "high_severity_count": sum(1 for f in flags if f["severity"] == "HIGH"),
+            "has_critical": any(f["severity"] == "HIGH" for f in flags),
+        }
 
 
 # ===========================================================================

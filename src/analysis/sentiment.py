@@ -312,13 +312,19 @@ class SentimentAnalyzer:
         ownership: dict,
         short_interest: dict,
     ) -> float:
-        """Heuristic score from analyst consensus + insider + ownership signals.
+        """Weighted heuristic score from analyst consensus + insider + ownership signals.
 
         Returns float from -1.0 to 1.0.
+        Uses explicit weights instead of equal-weight averaging:
+        - Analyst consensus: 40% (most informative for price direction)
+        - Insider activity: 25% (strongest signal when present)
+        - Ownership structure: 15% (mild directional signal)
+        - Short interest: 20% (contrarian/risk indicator)
         """
-        scores = []
+        components: list[tuple[float, float]] = []  # (score, weight)
 
-        # Analyst consensus heuristic
+        # Analyst consensus heuristic (40% weight)
+        analyst_score = 0.0
         if analyst_recs:
             grade_map = {
                 "Strong Buy": 1.0, "Buy": 0.5, "Overweight": 0.4,
@@ -328,42 +334,67 @@ class SentimentAnalyzer:
                 "Underweight": -0.3, "Underperform": -0.4,
                 "Sell": -0.5, "Strong Sell": -1.0, "Reduce": -0.4,
             }
+            # Weight recent recommendations higher (exponential decay)
             grades = []
-            for rec in analyst_recs:
+            for i, rec in enumerate(analyst_recs):
                 grade = rec.get("To Grade", rec.get("toGrade", ""))
                 if grade in grade_map:
-                    grades.append(grade_map[grade])
+                    recency_weight = 0.8 ** i  # most recent = 1.0, older = decaying
+                    grades.append((grade_map[grade], recency_weight))
             if grades:
-                scores.append(sum(grades) / len(grades))
+                analyst_score = sum(g * w for g, w in grades) / sum(w for _, w in grades)
+        components.append((analyst_score, 0.40))
 
-        # Insider trade heuristic (net buy = bullish, net sell = bearish)
+        # Insider trade heuristic (25% weight) — now considers trade SIZE
+        insider_score = 0.0
         if insider_trades:
-            net_change = sum(t.get("change", 0) for t in insider_trades[:20])
-            if net_change > 0:
-                scores.append(0.3)
-            elif net_change < 0:
-                scores.append(-0.2)
-            else:
-                scores.append(0.0)
+            # Weight by absolute change size (large trades matter more)
+            changes = [t.get("change", 0) for t in insider_trades[:20]]
+            abs_total = sum(abs(c) for c in changes) or 1
+            weighted_net = sum(c for c in changes) / abs_total  # -1 to +1
 
-        # High insider ownership is mildly bullish (skin in the game)
+            if weighted_net > 0.3:
+                insider_score = 0.5
+            elif weighted_net > 0.1:
+                insider_score = 0.3
+            elif weighted_net < -0.3:
+                insider_score = -0.4
+            elif weighted_net < -0.1:
+                insider_score = -0.2
+        components.append((insider_score, 0.25))
+
+        # Ownership structure (15% weight)
+        ownership_score = 0.0
         insider_pct = ownership.get("insider_pct")
         if insider_pct is not None:
             if insider_pct > 0.10:
-                scores.append(0.2)
-            elif insider_pct > 0.03:
-                scores.append(0.1)
+                ownership_score = 0.3
+            elif insider_pct > 0.05:
+                ownership_score = 0.2
+            elif insider_pct > 0.02:
+                ownership_score = 0.1
+        components.append((ownership_score, 0.15))
 
-        # High short interest is contrarian bearish signal
+        # Short interest (20% weight) — dual signal: bearish but also squeeze potential
+        short_score = 0.0
         short_pct = short_interest.get("short_pct_of_float")
+        short_change = short_interest.get("short_change_pct")
         if short_pct is not None:
             if short_pct > 0.20:
-                scores.append(-0.3)
+                short_score = -0.4
             elif short_pct > 0.10:
-                scores.append(-0.15)
+                short_score = -0.2
+            elif short_pct > 0.05:
+                short_score = -0.1
+            # If short interest is declining, that's bullish
+            if short_change is not None and short_change < -10:
+                short_score += 0.15  # shorts covering
+        components.append((short_score, 0.20))
 
-        if scores:
-            return round(sum(scores) / len(scores), 3)
+        # Weighted average
+        total_weight = sum(w for _, w in components)
+        if total_weight > 0:
+            return round(sum(s * w for s, w in components) / total_weight, 3)
         return 0.0
 
     @staticmethod

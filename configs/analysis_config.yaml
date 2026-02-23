@@ -1,0 +1,146 @@
+# ==============================================================================
+# Analysis Engine Configuration
+# ==============================================================================
+# Externalized thresholds, weights, and parameters for all analysis engines.
+# Edit this file to tune the system without code changes.
+
+# --- Scoring Weights ---
+scoring:
+  composite_weights:
+    fundamental: 0.30
+    valuation: 0.25
+    technical: 0.20
+    sentiment: 0.10
+    risk: 0.15
+  recommendation_thresholds:
+    strong_buy: 75
+    buy: 60
+    hold: 45
+    sell: 30
+    # Below 30 = STRONG SELL
+
+# --- Fundamental Thresholds ---
+fundamental:
+  health:
+    current_ratio_strong: 1.5
+    current_ratio_adequate: 1.0
+    debt_equity_low: 50
+    debt_equity_moderate: 100
+    roe_strong: 0.15
+    roe_adequate: 0.08
+  growth:
+    revenue_strong: 0.15
+    revenue_moderate: 0.05
+    earnings_strong: 0.15
+    earnings_moderate: 0.05
+  roic:
+    excellent: 0.20
+    good: 0.12
+    acceptable: 0.08
+  red_flags:
+    leverage_warning: 150    # debt/equity %
+    leverage_critical: 250
+    accruals_warning: 0.10   # accruals ratio
+    dilution_warning: 0.03   # 3% share count increase
+
+# --- Technical Thresholds ---
+technical:
+  rsi:
+    oversold: 30
+    overbought: 70
+    confirmation_window: 5   # days to check for sustained signal
+  bollinger:
+    high_volatility_bandwidth: 0.15  # above this, BB signals less reliable
+  volume:
+    spike_threshold: 1.5     # x average = elevated
+    strong_spike: 2.0        # x average = high volume
+    weak_threshold: 0.5      # below this = low conviction
+
+# --- Risk Thresholds ---
+risk:
+  volatility:
+    low: 0.15
+    moderate: 0.30
+    high: 0.50
+  tail_risk:
+    negative_skew_threshold: -0.5
+    fat_tail_kurtosis: 3.0
+    extreme_kurtosis: 5.0
+  liquidity:
+    illiquid_dollar_vol: 500000
+    low_liquidity_dollar_vol: 5000000
+    adequate_dollar_vol: 50000000
+
+# --- Valuation Parameters ---
+valuation:
+  equity_risk_premium: 0.06
+  default_terminal_growth: 0.025
+  country_premiums:
+    United States: 0.0
+    Japan: 0.015
+    Taiwan: 0.03
+    South Korea: 0.02
+    Netherlands: 0.005
+    France: 0.005
+    Germany: 0.005
+    China: 0.025
+    Israel: 0.015
+  sector_exit_multiples:
+    Technology: 18
+    Semiconductors: 15
+    Communication Services: 16
+    Consumer Cyclical: 12
+    Consumer Defensive: 14
+    Healthcare: 16
+    Industrials: 12
+    Financial Services: 10
+    Energy: 8
+    Utilities: 10
+
+# --- Sentiment Weights ---
+sentiment:
+  heuristic_weights:
+    analyst_consensus: 0.40
+    insider_activity: 0.25
+    ownership_structure: 0.15
+    short_interest: 0.20
+  short_interest:
+    elevated: 0.10
+    high: 0.20
+
+# --- Moat Dimension Weights ---
+moat:
+  dimension_weights:
+    market_dominance: 0.20
+    switching_costs: 0.15
+    technology_lockin: 0.15
+    supply_chain_criticality: 0.20
+    pricing_power: 0.15
+    barriers_to_entry: 0.15
+
+# --- Benchmark Mapping ---
+benchmarks:
+  country:
+    Japan: EWJ
+    Taiwan: EWT
+    South Korea: EWY
+    Netherlands: EWN
+    Germany: EWG
+    France: EWQ
+    China: MCHI
+    United Kingdom: EWU
+    Israel: EIS
+  sector:
+    Technology: XLK
+    Semiconductors: SOXX
+    Communication Services: XLC
+    Consumer Cyclical: XLY
+    Consumer Defensive: XLP
+    Healthcare: XLV
+    Industrials: XLI
+    Financial Services: XLF
+    Energy: XLE
+    Utilities: XLU
+    Real Estate: XLRE
+    Basic Materials: XLB
+  default: SPY
