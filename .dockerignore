@@ -34,8 +34,7 @@ Thumbs.db
 .env
 .env.*
 
-# Analysis pipeline (not needed for dashboard container)
-src/
+# Analysis pipeline extras (not needed for dashboard container)
 sops/
 tests/
 notebooks/
