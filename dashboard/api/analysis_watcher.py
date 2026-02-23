@@ -16,6 +16,7 @@ Flow:
 
 import json
 import logging
+import re
 import sqlite3
 import subprocess
 import time
@@ -104,41 +105,18 @@ def build_prompt(ticker: str, metrics: dict) -> str:
 ### Conviction Meta-Score
 {json.dumps(metrics.get('conviction', {}), indent=2, default=str)}
 
-## Your Analysis Must Include:
+## Instructions
 
-1. **Executive Summary** (2-3 sentences: what the stock is, overall verdict, why NOW is the time to act)
-2. **Why the Market Is Wrong** (what is the market missing or mispricing? what information asymmetry exists? why is the consensus wrong?)
-3. **Bull Case** (3-5 bullet points with reasoning, each tied to specific data points above)
-4. **Bear Case** (3-5 bullet points with reasoning, each tied to specific data points above)
-5. **Competitive Positioning** (moat strength, key advantages, threats — reference moat scores)
-6. **Valuation Assessment** (is DCF reasonable? what does sensitivity say? comps alignment? ADR premium/discount if applicable)
-7. **Risk Factors** (top 3-5 risks with probability and impact, including FX risk for international names)
-8. **Catalyst Timeline** (specific upcoming dates: earnings, product launches, regulatory decisions, conferences — use the catalyst calendar data and earnings calendar)
-9. **Institutional Signal** (what are whales doing? short interest trend? insider buying/selling patterns?)
-10. **Fair Value Range** (bear/base/bull price targets with reasoning, factoring in ADR premium if applicable)
-11. **Position Sizing** (SMALL / MEDIUM / FULL — based on conviction level, liquidity, and risk. SMALL = 1-2% of portfolio, MEDIUM = 3-5%, FULL = 5-8%)
-12. **Key Metrics to Watch** (3-5 specific metrics or events that would CHANGE your thesis — what would make you exit?)
-13. **Final Recommendation** (BUY/HOLD/SELL with conviction level: HIGH/MEDIUM/LOW)
+You are a senior equity research analyst at a hedge fund with deep expertise in international equities, ADR arbitrage, and catalyst-driven investing. Write a comprehensive investment analysis report for {ticker} in **Markdown format**.
 
-## Output Format
+Structure your report however you see fit based on what the data reveals — there is no fixed template. Write naturally and insightfully as you would for an investment committee presentation. Use your judgment on what matters most for this particular company.
 
-Output ONLY valid JSON with these exact keys:
-- executive_summary (string)
-- market_mispricing (string — why the market is wrong)
-- bull_case (array of strings)
-- bear_case (array of strings)
-- competitive_positioning (string)
-- valuation_assessment (string)
-- risk_factors (array of objects with: risk, probability, impact, mitigation)
-- catalyst_timeline (array of objects with: date, event, expected_impact)
-- institutional_signal (string — summary of whale/short/insider activity)
-- fair_value_range (object with: bear, base, bull — each a number)
-- position_sizing (string: "SMALL" | "MEDIUM" | "FULL")
-- position_sizing_rationale (string)
-- key_metrics_to_watch (array of strings — what would change the thesis)
-- recommendation (string: "BUY" | "HOLD" | "SELL")
-- conviction (string: "HIGH" | "MEDIUM" | "LOW")
-- updated_at (string, ISO timestamp)
+Your report should cover the key aspects you find most relevant: company overview, investment thesis, valuation view (interpret the DCF and comps data), risk factors, upcoming catalysts, competitive positioning, and any contrarian insights. Use markdown headers (##), bullet points, bold text, and tables where they help communicate clearly.
+
+Be specific — cite actual numbers from the data (e.g., "RSI at 39 suggests oversold conditions" not just "technical picture is bearish"). If data shows errors or is unavailable, note it briefly and work with what you have.
+
+At the very end of your report, on its own line, include:
+**Recommendation: BUY|HOLD|SELL | Conviction: HIGH|MEDIUM|LOW**
 """
 
 
@@ -209,16 +187,25 @@ def run_analysis(trigger: dict):
             except (json.JSONDecodeError, TypeError):
                 text = proc.stdout
 
-            # Try to extract JSON from the response
-            thesis = _extract_json(text)
-            if thesis:
-                thesis["updated_at"] = datetime.utcnow().isoformat()
-                update_status(analysis_id, "completed", thesis, "claude-code")
-                logger.info("Thesis completed for %s", ticker)
+            # Try to parse as old-style JSON first (backward compat)
+            old_thesis = _extract_json(text)
+            if old_thesis and "executive_summary" in old_thesis:
+                old_thesis["updated_at"] = datetime.utcnow().isoformat()
+                update_status(analysis_id, "completed", old_thesis, "claude-code")
+                logger.info("Thesis completed for %s (JSON format)", ticker)
             else:
-                # Store as raw text if JSON extraction fails
-                update_status(analysis_id, "completed", {"raw_text": text, "updated_at": datetime.utcnow().isoformat()}, "claude-code")
-                logger.warning("Could not extract structured JSON for %s, stored raw text", ticker)
+                # New freeform markdown path
+                rec_match = re.search(
+                    r'\*\*Recommendation:\s*(BUY|HOLD|SELL)\s*\|\s*Conviction:\s*(HIGH|MEDIUM|LOW)\*\*',
+                    text, re.IGNORECASE,
+                )
+                thesis_data = {
+                    "markdown": text,
+                    "recommendation": rec_match.group(1).upper() if rec_match else "HOLD",
+                    "conviction": rec_match.group(2).upper() if rec_match else "MEDIUM",
+                }
+                update_status(analysis_id, "completed", thesis_data, "claude-code")
+                logger.info("Thesis completed for %s (markdown format)", ticker)
         else:
             error = proc.stderr or "Claude Code returned no output"
             logger.error("Claude Code failed for %s: %s", ticker, error)

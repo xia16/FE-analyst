@@ -337,7 +337,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
               <>
                 <span className={`text-lg font-semibold ${(summary.total_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {summary.total_pnl != null
-                    ? `${summary.total_pnl >= 0 ? '+' : ''}$${Math.abs(summary.total_pnl).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                    ? `${summary.total_pnl >= 0 ? '+' : '-'}$${Math.abs(summary.total_pnl).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
                     : ''}
                 </span>
                 <span className={`text-sm font-medium px-2 py-0.5 rounded-full ${
@@ -785,7 +785,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
                         </td>
                         <td className="py-2 pr-2 text-right font-mono">{locked ? mask(true) : (h.market_value ? fmtCurrency(h.market_value) : '—')}</td>
                         <td className={`py-2 pr-2 text-right font-mono ${(h.unrealized_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {locked ? mask(true) : (h.unrealized_pnl != null ? `${h.unrealized_pnl >= 0 ? '+' : ''}$${Math.abs(h.unrealized_pnl).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '—')}
+                          {locked ? mask(true) : (h.unrealized_pnl != null ? `${h.unrealized_pnl >= 0 ? '+' : '-'}$${Math.abs(h.unrealized_pnl).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '—')}
                         </td>
                         <td className={`py-2 pr-2 text-right font-mono font-semibold ${(h.unrealized_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                           {fmtPct(h.unrealized_pct)}
@@ -1319,7 +1319,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
                 <Card>
                   <div className="text-[#8b8d97] text-[10px] mb-1">Total Realized P&L</div>
                   <div className={`text-lg font-bold font-mono ${(s.total_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {locked ? mask(true) : `${s.total_pnl >= 0 ? '+' : ''}$${Math.abs(s.total_pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                    {locked ? mask(true) : `${s.total_pnl >= 0 ? '+' : '-'}$${Math.abs(s.total_pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                   </div>
                 </Card>
                 <Card>

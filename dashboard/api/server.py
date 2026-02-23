@@ -1174,7 +1174,7 @@ def api_get_holdings():
             price_usd = current_price
             avg_cost_usd = h["avg_cost"]
             market_value = current_price * h["quantity"] if current_price else None
-            cost_basis = h["total_invested"]
+            cost_basis = h["avg_cost"] * h["quantity"]  # Always compute fresh, don't rely on stale total_invested
 
         unrealized_pnl = (market_value - cost_basis) if market_value else None
         unrealized_pct = (unrealized_pnl / cost_basis * 100) if unrealized_pnl and cost_basis else None

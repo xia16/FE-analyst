@@ -95,6 +95,7 @@ class StockScorer:
 
             # DCF score (60% weight)
             mos = dcf.get("margin_of_safety_pct", 0)
+            mos = max(-50, min(50, mos))  # Clamp MOS so score stays 0-100 without extremes
             dcf_score = max(0, min(100, 50 + mos))
 
             # Comps score (25% weight)
@@ -125,9 +126,12 @@ class StockScorer:
         try:
             df = self.market.get_price_history(ticker)
             signals = self.tech.get_signals(df)
-            buy_count = sum(1 for s in signals.values() if s.get("signal") == "BUY")
+            signal_sum = sum(
+                1.0 if s.get("signal") == "BUY" else 0.5 if s.get("signal") == "HOLD" else 0.0
+                for s in signals.values()
+            )
             total = len(signals) or 1
-            scores["technical"] = (buy_count / total) * 100
+            scores["technical"] = (signal_sum / total) * 100
             details["technical"] = signals
         except Exception as e:
             logger.error("Technical analysis failed: %s", e)

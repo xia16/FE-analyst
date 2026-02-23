@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Card, Badge, Spinner, StatusBadge, RECOMMENDATION_COLORS } from '../../components/shared'
 
 export default function ThesisTab({ ticker, thesis, thesisStatus, onTriggerAnalysis }) {
@@ -6,7 +8,7 @@ export default function ThesisTab({ ticker, thesis, thesisStatus, onTriggerAnaly
 
   const status = thesisStatus?.status || thesis?.status || 'none'
   const data = thesis?.thesis || {}
-  const hasThesis = status === 'completed' && data && Object.keys(data).length > 0 && !data.error
+  const hasThesis = status === 'completed' && data && (data.markdown || Object.keys(data).length > 0) && !data.error
 
   useEffect(() => {
     if (status === 'pending' || status === 'running') {
@@ -79,6 +81,63 @@ export default function ThesisTab({ ticker, thesis, thesisStatus, onTriggerAnaly
     )
   }
 
+  // Detect format: new markdown vs old structured JSON
+  const isMarkdown = !!data.markdown
+
+  if (isMarkdown) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {data.recommendation && (
+              <span className="text-lg font-bold" style={{ color: RECOMMENDATION_COLORS[data.recommendation] || '#3b82f6' }}>
+                {data.recommendation}
+              </span>
+            )}
+            {data.conviction && (
+              <Badge color={data.conviction === 'HIGH' ? '#22c55e' : data.conviction === 'LOW' ? '#ef4444' : '#eab308'}>
+                {data.conviction} conviction
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {thesis?.created_at && (
+              <span className="text-[10px] text-[#8b8d97]">
+                {new Date(thesis.created_at).toLocaleString()}
+              </span>
+            )}
+            <button onClick={handleAnalyze} className="px-3 py-1 bg-[#252940] text-[#8b8d97] text-xs rounded hover:text-white transition-colors">
+              Re-analyze
+            </button>
+          </div>
+        </div>
+
+        {/* Markdown content */}
+        <Card>
+          <div className="prose prose-invert prose-sm max-w-none
+            prose-headings:text-white prose-headings:font-semibold
+            prose-h2:text-base prose-h2:mt-6 prose-h2:mb-3 prose-h2:border-b prose-h2:border-[#2a2d3e] prose-h2:pb-2
+            prose-h3:text-sm prose-h3:mt-4 prose-h3:mb-2
+            prose-p:text-[#c8c9ce] prose-p:text-xs prose-p:leading-relaxed
+            prose-li:text-[#c8c9ce] prose-li:text-xs
+            prose-strong:text-white
+            prose-a:text-blue-400
+            prose-table:text-xs
+            prose-th:text-[#8b8d97] prose-th:font-medium prose-th:text-left prose-th:p-2 prose-th:border-b prose-th:border-[#2a2d3e]
+            prose-td:text-[#c8c9ce] prose-td:p-2 prose-td:border-b prose-td:border-[#1a1d2e]
+            prose-code:text-blue-300 prose-code:bg-[#1a1d2e] prose-code:px-1 prose-code:rounded
+          ">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {data.markdown}
+            </ReactMarkdown>
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  // OLD structured JSON rendering (backward compatibility)
   return (
     <div className="space-y-6">
       {/* Header with status and re-analyze */}
@@ -126,7 +185,7 @@ export default function ThesisTab({ ticker, thesis, thesisStatus, onTriggerAnaly
             <ul className="space-y-2">
               {(Array.isArray(data.bull_case) ? data.bull_case : [data.bull_case]).map((point, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs">
-                  <span className="text-green-400 mt-0.5 flex-shrink-0">\u25B2</span>
+                  <span className="text-green-400 mt-0.5 flex-shrink-0">{'\u25B2'}</span>
                   <span className="text-[#c8c9ce]">{point}</span>
                 </li>
               ))}
@@ -139,7 +198,7 @@ export default function ThesisTab({ ticker, thesis, thesisStatus, onTriggerAnaly
             <ul className="space-y-2">
               {(Array.isArray(data.bear_case) ? data.bear_case : [data.bear_case]).map((point, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs">
-                  <span className="text-red-400 mt-0.5 flex-shrink-0">\u25BC</span>
+                  <span className="text-red-400 mt-0.5 flex-shrink-0">{'\u25BC'}</span>
                   <span className="text-[#c8c9ce]">{point}</span>
                 </li>
               ))}

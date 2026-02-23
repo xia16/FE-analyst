@@ -71,10 +71,15 @@ class ValuationAnalyzer:
     # ------------------------------------------------------------------
 
     def _estimate_growth_rate(self, ticker: str) -> dict:
-        """Estimate FCF growth rate from multiple sources."""
+        """Estimate FCF growth rate from multiple sources.
+
+        Uses revenue growth and earnings growth as primary signals.
+        Historical FCF CAGR is only included when positive (FCF is too
+        volatile for capex-heavy companies like AMZN/GOOG to use negative CAGR).
+        """
         sources = {}
 
-        # Source 1: Historical FCF CAGR (3-year)
+        # Source 1: Historical FCF CAGR (3-year, only if positive both ends)
         try:
             cf = self.fundamentals.get_cash_flow(ticker)
             if not cf.empty and "Free Cash Flow" in cf.index:
@@ -83,12 +88,16 @@ class ValuationAnalyzer:
                     recent = float(fcf_row.iloc[0])
                     older = float(fcf_row.iloc[min(2, len(fcf_row) - 1)])
                     if older > 0 and recent > 0:
-                        cagr = (recent / older) ** (1.0 / min(2, len(fcf_row) - 1)) - 1
-                        sources["historical_fcf_cagr"] = cagr
+                        years = min(2, len(fcf_row) - 1)
+                        cagr = (recent / older) ** (1.0 / years) - 1
+                        # Only include if CAGR is plausible (FCF can swing wildly)
+                        if cagr > -0.20:
+                            sources["historical_fcf_cagr"] = cagr
         except Exception as e:
             logger.debug("FCF CAGR failed for %s: %s", ticker, e)
 
         # Source 2: Revenue growth from yfinance
+        ratios = {}
         try:
             ratios = self.fundamentals.get_key_ratios(ticker)
             rg = ratios.get("revenue_growth")
@@ -111,7 +120,7 @@ class ValuationAnalyzer:
         # Use median of available sources, capped to reasonable range
         vals = list(sources.values())
         selected = float(np.median(vals))
-        selected = max(-0.05, min(0.25, selected))
+        selected = max(-0.05, min(0.30, selected))
 
         return {
             "growth_rate": round(selected, 4),
@@ -209,14 +218,17 @@ class ValuationAnalyzer:
 
         try:
             info = yf.Ticker(ticker).info
-            total_debt = info.get("totalDebt", 0) or 0
+            # Use financial debt only (excludes operating lease liabilities)
+            financial_debt = info.get("longTermDebt", 0) or 0
+            if financial_debt == 0:
+                financial_debt = info.get("totalDebt", 0) or 0
             market_cap = info.get("marketCap", 0) or 0
             interest_expense = abs(info.get("interestExpense", 0) or 0)
 
-            if total_debt > 0 and market_cap > 0:
-                # Cost of debt = interest expense / total debt
+            if financial_debt > 0 and market_cap > 0:
+                # Cost of debt = interest expense / financial debt
                 if interest_expense > 0:
-                    cost_of_debt = interest_expense / total_debt
+                    cost_of_debt = interest_expense / financial_debt
                     # Clamp to reasonable range (1% - 15%)
                     cost_of_debt = max(0.01, min(0.15, cost_of_debt))
                 else:
@@ -227,9 +239,9 @@ class ValuationAnalyzer:
                 tax_rate = self._estimate_tax_rate(ticker)
 
                 # Capital structure weights
-                total_capital = market_cap + total_debt
+                total_capital = market_cap + financial_debt
                 equity_weight = market_cap / total_capital
-                debt_weight = total_debt / total_capital
+                debt_weight = financial_debt / total_capital
 
                 # WACC = Ke * (E/(E+D)) + Kd * (1-t) * (D/(E+D))
                 wacc = (
@@ -264,22 +276,48 @@ class ValuationAnalyzer:
     # ------------------------------------------------------------------
 
     def _net_debt_adjustment(self, ticker: str) -> dict:
-        """Calculate net debt: Total Debt - Cash."""
+        """Calculate net debt: Financial Debt - Cash & Equivalents.
+
+        Uses *financial* debt only (Long Term Debt + Current Debt), excluding
+        operating lease liabilities which yfinance bundles into "Total Debt".
+        For cash, prefers Cash + Short Term Investments (broader liquidity).
+        """
         try:
             bs = self.fundamentals.get_balance_sheet(ticker)
             if bs.empty:
                 return {"total_debt": 0, "cash": 0, "net_debt": 0, "note": "No balance sheet data"}
 
-            total_debt = 0
-            for key in ["Total Debt", "Long Term Debt", "Total Non Current Liabilities Incl Long Term Debt"]:
+            # --- Financial debt (exclude lease liabilities) ---
+            long_term_debt = 0
+            for key in ["Long Term Debt", "Long Term Debt And Capital Lease Obligation"]:
                 if key in bs.index:
                     val = bs.loc[key].iloc[0]
                     if pd.notna(val):
-                        total_debt = float(val)
+                        long_term_debt = float(val)
                         break
 
+            # If we got the lease-inflated figure, try to subtract leases
+            if long_term_debt > 0:
+                pure_lt = bs.loc["Long Term Debt"].iloc[0] if "Long Term Debt" in bs.index else None
+                if pure_lt is not None and pd.notna(pure_lt) and float(pure_lt) > 0:
+                    long_term_debt = float(pure_lt)
+
+            current_debt = 0
+            for key in ["Current Debt", "Current Debt And Capital Lease Obligation",
+                        "Short Long Term Debt", "Current Long Term Debt"]:
+                if key in bs.index:
+                    val = bs.loc[key].iloc[0]
+                    if pd.notna(val):
+                        current_debt = float(val)
+                        break
+
+            total_debt = long_term_debt + current_debt
+
+            # --- Cash & liquid assets ---
             cash = 0
-            for key in ["Cash And Cash Equivalents", "Cash Cash Equivalents And Short Term Investments", "Cash"]:
+            # Prefer broader measure (cash + short-term investments)
+            for key in ["Cash Cash Equivalents And Short Term Investments",
+                        "Cash And Cash Equivalents", "Cash"]:
                 if key in bs.index:
                     val = bs.loc[key].iloc[0]
                     if pd.notna(val):
@@ -288,9 +326,11 @@ class ValuationAnalyzer:
 
             return {
                 "total_debt": total_debt,
+                "long_term_debt": long_term_debt,
+                "current_debt": current_debt,
                 "cash": cash,
                 "net_debt": total_debt - cash,
-                "note": "Balance sheet sourced",
+                "note": "Balance sheet sourced (financial debt only, excl. lease liabilities)",
             }
         except Exception as e:
             logger.warning("Net debt failed for %s: %s", ticker, e)
@@ -575,6 +615,48 @@ class ValuationAnalyzer:
         return None
 
     # ------------------------------------------------------------------
+    # Smoothed FCF helper
+    # ------------------------------------------------------------------
+
+    def _get_smoothed_fcf(self, ticker: str) -> tuple[float, list[str]]:
+        """Return (current_fcf, warnings) using smoothed FCF logic.
+
+        If the latest FCF is less than 40% of the average of prior positive
+        years, use the average of up to 3 positive years instead.
+        """
+        warnings: list[str] = []
+
+        cf = self.fundamentals.get_cash_flow(ticker)
+        if cf.empty or "Free Cash Flow" not in cf.index:
+            return 0.0, ["No FCF data available"]
+
+        fcf_row = cf.loc["Free Cash Flow"]
+        fcf_vals = fcf_row.dropna()
+        positive_fcfs = [float(v) for v in fcf_vals if float(v) > 0]
+        latest_fcf = float(fcf_vals.iloc[0]) if len(fcf_vals) > 0 else 0
+
+        if len(positive_fcfs) >= 2 and latest_fcf > 0:
+            avg_prior = np.mean(positive_fcfs[1:]) if len(positive_fcfs) > 1 else positive_fcfs[0]
+            if latest_fcf < avg_prior * 0.40:
+                current_fcf = float(np.mean(positive_fcfs[:3]))
+                warnings.append(
+                    f"Latest FCF anomalously low vs prior years; "
+                    f"using {len(positive_fcfs[:3])}-year positive average"
+                )
+            else:
+                current_fcf = latest_fcf
+        elif latest_fcf > 0:
+            current_fcf = latest_fcf
+        elif positive_fcfs:
+            current_fcf = positive_fcfs[0]
+            warnings.append("Latest FCF negative; using most recent positive year")
+        else:
+            current_fcf = latest_fcf  # negative — will produce negative valuation
+            warnings.append("No positive FCF years found")
+
+        return current_fcf, warnings
+
+    # ------------------------------------------------------------------
     # Reverse DCF: implied growth rate
     # ------------------------------------------------------------------
 
@@ -586,12 +668,8 @@ class ValuationAnalyzer:
         """
         import yfinance as yf
 
-        # Gather inputs
-        cf = self.fundamentals.get_cash_flow(ticker)
-        if cf.empty or "Free Cash Flow" not in cf.index:
-            return {"error": "No FCF data for reverse DCF"}
-
-        current_fcf = float(cf.loc["Free Cash Flow"].iloc[0])
+        # Gather inputs — use smoothed FCF for consistency with dcf_valuation
+        current_fcf, _fcf_warnings = self._get_smoothed_fcf(ticker)
         if current_fcf <= 0:
             return {
                 "error": "Negative or zero FCF; reverse DCF not meaningful",
@@ -716,16 +794,9 @@ class ValuationAnalyzer:
         """
         import yfinance as yf
 
-        cf = self.fundamentals.get_cash_flow(ticker)
-        if cf.empty:
+        current_fcf, warnings = self._get_smoothed_fcf(ticker)
+        if current_fcf == 0.0 and warnings and "No FCF data" in warnings[0]:
             return {"error": "No cash flow data available"}
-
-        fcf_row = cf.loc["Free Cash Flow"] if "Free Cash Flow" in cf.index else None
-        if fcf_row is None:
-            return {"error": "Free Cash Flow not found in statements"}
-
-        current_fcf = float(fcf_row.iloc[0])
-        warnings = []
 
         # --- Growth rate estimation ---
         growth_info = {"source": "override", "sources": {}}
@@ -793,7 +864,7 @@ class ValuationAnalyzer:
         margin_of_safety = (
             (intrinsic_per_share - current_price) / intrinsic_per_share * 100
             if intrinsic_per_share > 0
-            else 0
+            else -100
         )
 
         # --- Sensitivity analysis ---

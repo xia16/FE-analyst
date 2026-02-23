@@ -276,8 +276,8 @@ class FundamentalAnalyzer:
 
             total_equity = _safe_get(balance, "Stockholders Equity",
                                      fallbacks=["Total Equity Gross Minority Interest"])
-            total_debt = _safe_get(balance, "Total Debt",
-                                   fallbacks=["Long Term Debt"])
+            total_debt = _safe_get(balance, "Long Term Debt",
+                                   fallbacks=["Total Debt"])
             cash = _safe_get(balance, "Cash And Cash Equivalents",
                              fallbacks=["Cash Cash Equivalents And Short Term Investments"])
 
@@ -349,14 +349,15 @@ class FundamentalAnalyzer:
 
             # --- Leverage / Liquidity ---
             # F5: Long-term debt ratio decreased (or stayed zero)
-            ltd_curr = _safe_get(balance, "Long Term Debt", col=0) or 0
-            if has_two_years:
-                ltd_prev = _safe_get(balance, "Long Term Debt", col=1) or 0
-                if ltd_curr <= ltd_prev:
-                    breakdown["F5"] = True
-            else:
-                if ltd_curr == 0:
-                    breakdown["F5"] = True
+            ltd_curr = _safe_get(balance, "Long Term Debt", col=0)
+            if ltd_curr is not None:
+                if has_two_years:
+                    ltd_prev = _safe_get(balance, "Long Term Debt", col=1) or 0
+                    if ltd_curr <= ltd_prev:
+                        breakdown["F5"] = True
+                else:
+                    if ltd_curr == 0:
+                        breakdown["F5"] = True
 
             # F6: Current ratio increased
             ca_curr = _safe_get(balance, "Current Assets", col=0)
@@ -373,7 +374,6 @@ class FundamentalAnalyzer:
                     breakdown["F6"] = True
 
             # F7: No new share dilution
-            shares_curr = info.get("sharesOutstanding")
             # yfinance income_stmt sometimes has "Diluted Average Shares"
             diluted_curr = _safe_get(income, "Diluted Average Shares",
                                      fallbacks=["Basic Average Shares"], col=0)
@@ -383,12 +383,11 @@ class FundamentalAnalyzer:
                 if diluted_curr is not None and diluted_prev is not None:
                     if diluted_curr <= diluted_prev:
                         breakdown["F7"] = True
-                elif shares_curr is not None:
-                    # Fallback: assume no dilution if we have current but not prev
-                    breakdown["F7"] = True
             else:
-                # Single year: assume no dilution
-                breakdown["F7"] = True
+                # Single year: only award if we have data confirming no dilution
+                if diluted_curr is not None:
+                    # Data exists for current year; no prior to compare, leave False
+                    pass
 
             # --- Operating Efficiency ---
             # F8: Gross margin increased
@@ -636,8 +635,7 @@ class FundamentalAnalyzer:
                         score += 1  # investing more than maintaining
 
                 # Buyback yield
-                buyback = _safe_get(cashflow, "Repurchase Of Capital Stock",
-                                    fallbacks=["Common Stock Issuance"])
+                buyback = _safe_get(cashflow, "Repurchase Of Capital Stock")
                 market_cap = info.get("marketCap")
                 if buyback is not None and market_cap and market_cap > 0:
                     # Buyback value is typically negative in cash flow
