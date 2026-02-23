@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react'
 import {
-  useHoldings, useTradeHistory, useAllocation, usePerformance, useBenchmark, useMovers,
+  useHoldings, useTradeHistory, useAllocation, usePerformance, useBenchmark, useMovers, useRealizedPnl,
 } from '../hooks'
 import { Card, Spinner, fmt, fmtPct, fmtCurrency, SECTOR_COLORS } from '../components/shared'
 import {
@@ -101,6 +101,15 @@ export default function MyPortfolioView({ onSelectTicker }) {
   const [adjustSaving, setAdjustSaving] = useState(false)
   const [adjustError, setAdjustError] = useState(null)
 
+  // Log Trade modal state
+  const [showLogTrade, setShowLogTrade] = useState(false)
+  const [tradeForm, setTradeForm] = useState({ action: 'BUY', ticker: '', name: '', quantity: '', price: '', sector: '', country: '', currency: 'USD' })
+  const [tradeSaving, setTradeSaving] = useState(false)
+  const [tradeError, setTradeError] = useState(null)
+
+  // Realized P&L
+  const { data: realizedData, refetch: refetchRealized } = useRealizedPnl()
+
   const [lockTimer, setLockTimer] = useState(null)
 
   const handleUnlock = async () => {
@@ -181,6 +190,89 @@ export default function MyPortfolioView({ onSelectTicker }) {
     }
   }
 
+  const lookupTicker = async (ticker) => {
+    if (!ticker || ticker.length < 1) return
+    try {
+      const res = await fetch(`/api/ticker-info/${ticker.trim().toUpperCase()}`)
+      if (!res.ok) return
+      const info = await res.json()
+      setTradeForm(prev => ({
+        ...prev,
+        name: prev.name || info.name || '',
+        sector: prev.sector || info.sector || '',
+        country: prev.country || info.country || '',
+        currency: info.currency || prev.currency || 'USD',
+      }))
+    } catch { /* ignore lookup failures */ }
+  }
+
+  const openLogTrade = (action = 'BUY', holding = null) => {
+    setTradeForm({
+      action,
+      ticker: holding?.ticker || '',
+      name: holding?.quote_name || holding?.name || '',
+      quantity: '',
+      price: '',
+      sector: holding?.sector || '',
+      country: holding?.country || '',
+      currency: holding?.currency || 'USD',
+    })
+    setTradeError(null)
+    setShowLogTrade(true)
+  }
+
+  const handleLogTrade = async () => {
+    if (!tradeForm.ticker.trim() || !tradeForm.quantity || !tradeForm.price) {
+      setTradeError('Ticker, quantity, and price are required')
+      return
+    }
+    const qty = parseInt(tradeForm.quantity)
+    const action = tradeForm.action.toUpperCase()
+
+    // Validate sell quantity against current holdings
+    if (action === 'SELL') {
+      const holding = holdings.find(h => h.ticker === tradeForm.ticker.trim().toUpperCase())
+      if (!holding) {
+        setTradeError(`You don't hold ${tradeForm.ticker.trim().toUpperCase()}`)
+        return
+      }
+      if (qty > holding.quantity) {
+        setTradeError(`Cannot sell ${qty} shares — you only hold ${holding.quantity}`)
+        return
+      }
+    }
+
+    setTradeSaving(true)
+    setTradeError(null)
+    try {
+      const res = await fetch('/api/trades/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          ticker: tradeForm.ticker.trim().toUpperCase(),
+          name: tradeForm.name.trim() || null,
+          quantity: qty,
+          price: parseFloat(tradeForm.price),
+          sector: tradeForm.sector,
+          country: tradeForm.country,
+          currency: tradeForm.currency,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.detail || `HTTP ${res.status}`)
+      }
+      setShowLogTrade(false)
+      refetch()
+      refetchRealized()
+    } catch (err) {
+      setTradeError(err.message)
+    } finally {
+      setTradeSaving(false)
+    }
+  }
+
   if (loading) return <Spinner />
   if (error) return <div className="text-red-400 p-4">Error: {error}</div>
 
@@ -207,6 +299,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
     { id: 'overview', label: 'Overview' },
     { id: 'performance', label: 'Performance' },
     { id: 'trades', label: 'Trade History' },
+    { id: 'realized', label: 'Realized P&L' },
   ]
 
   // Helper: render a dollar value or mask it
@@ -267,15 +360,15 @@ export default function MyPortfolioView({ onSelectTicker }) {
           >
             Refresh
           </button>
-          {/* Adjust positions button */}
+          {/* Log Trade button */}
           <button
-            onClick={() => openAdjust()}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#8b8d97] hover:text-white hover:bg-[#1e2130] transition-colors flex items-center gap-1.5 border border-[#2a2d3e]"
+            onClick={() => openLogTrade('BUY')}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium text-white hover:brightness-110 transition-all flex items-center gap-1.5 bg-gradient-to-r from-[#3b82f6] to-[#6366f1]"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
-            Add Position
+            Log Trade
           </button>
           {/* Lock / Unlock button */}
           <button
@@ -309,7 +402,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
 
       {/* Password prompt modal */}
       {showPwPrompt && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowPwPrompt(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto pt-16 pb-8" onClick={() => setShowPwPrompt(false)}>
           <div className="bg-[#1e2130] border border-[#2a2d3e] rounded-xl p-6 w-80 shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-semibold mb-3">Unlock Portfolio</h3>
             <p className="text-xs text-[#8b8d97] mb-4">Enter password to reveal portfolio values.</p>
@@ -343,11 +436,11 @@ export default function MyPortfolioView({ onSelectTicker }) {
         </div>
       )}
 
-      {/* Adjust position modal */}
+      {/* Adjust position modal (for editing existing positions) */}
       {showAdjust && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowAdjust(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto pt-16 pb-8" onClick={() => setShowAdjust(false)}>
           <div className="bg-[#1e2130] border border-[#2a2d3e] rounded-xl p-6 w-96 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-sm font-semibold mb-4">{adjustForm.ticker ? `Edit ${adjustForm.ticker}` : 'Add Position'}</h3>
+            <h3 className="text-sm font-semibold mb-4">Edit {adjustForm.ticker || 'Position'}</h3>
             <div className="space-y-3">
               <div>
                 <label className="text-[10px] text-[#8b8d97] block mb-1">Ticker *</label>
@@ -355,7 +448,8 @@ export default function MyPortfolioView({ onSelectTicker }) {
                   value={adjustForm.ticker}
                   onChange={e => setAdjustForm({ ...adjustForm, ticker: e.target.value })}
                   placeholder="e.g. AAPL"
-                  className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#3b82f6]"
+                  disabled={!!adjustForm.ticker}
+                  className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#3b82f6] disabled:opacity-50"
                 />
               </div>
               <div>
@@ -425,6 +519,154 @@ export default function MyPortfolioView({ onSelectTicker }) {
                 className="flex-1 px-4 py-2 rounded-lg text-xs font-medium text-white bg-[#3b82f6] hover:bg-[#2563eb] disabled:opacity-50 transition-colors"
               >
                 {adjustSaving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Log Trade modal */}
+      {showLogTrade && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto pt-16 pb-8" onClick={() => setShowLogTrade(false)}>
+          <div className="bg-[#1e2130] border border-[#2a2d3e] rounded-xl p-6 w-96 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold mb-4">Log Trade</h3>
+            {/* BUY / SELL toggle */}
+            <div className="flex rounded-lg overflow-hidden border border-[#2a2d3e] mb-4">
+              {['BUY', 'SELL'].map(a => (
+                <button
+                  key={a}
+                  onClick={() => setTradeForm({ ...tradeForm, action: a })}
+                  className={`flex-1 py-2 text-xs font-bold transition-colors ${
+                    tradeForm.action === a
+                      ? a === 'BUY'
+                        ? 'bg-green-500/20 text-green-400 border-b-2 border-green-400'
+                        : 'bg-red-500/20 text-red-400 border-b-2 border-red-400'
+                      : 'text-[#8b8d97] hover:text-white'
+                  }`}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-[#8b8d97] block mb-1">Ticker *</label>
+                  <input
+                    value={tradeForm.ticker}
+                    onChange={e => setTradeForm({ ...tradeForm, ticker: e.target.value })}
+                    onBlur={e => lookupTicker(e.target.value)}
+                    placeholder="e.g. AAPL"
+                    className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#3b82f6]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#8b8d97] block mb-1">Name</label>
+                  <input
+                    value={tradeForm.name}
+                    onChange={e => setTradeForm({ ...tradeForm, name: e.target.value })}
+                    placeholder="e.g. Apple Inc"
+                    className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3b82f6]"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-[#8b8d97] block mb-1">
+                    Shares *
+                    {tradeForm.action === 'SELL' && tradeForm.ticker && (() => {
+                      const h = holdings.find(x => x.ticker === tradeForm.ticker.trim().toUpperCase())
+                      return h ? <span className="text-[#8b8d97] ml-1">(hold: {h.quantity})</span> : null
+                    })()}
+                  </label>
+                  <input
+                    type="number"
+                    value={tradeForm.quantity}
+                    onChange={e => setTradeForm({ ...tradeForm, quantity: e.target.value })}
+                    placeholder="100"
+                    min="1"
+                    className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#3b82f6]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#8b8d97] block mb-1">Price per Share *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={tradeForm.price}
+                    onChange={e => setTradeForm({ ...tradeForm, price: e.target.value })}
+                    placeholder="150.00"
+                    className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#3b82f6]"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[10px] text-[#8b8d97] block mb-1">Sector</label>
+                  <input
+                    value={tradeForm.sector}
+                    onChange={e => setTradeForm({ ...tradeForm, sector: e.target.value })}
+                    placeholder="e.g. Tech"
+                    className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3b82f6]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#8b8d97] block mb-1">Country</label>
+                  <input
+                    value={tradeForm.country}
+                    onChange={e => setTradeForm({ ...tradeForm, country: e.target.value })}
+                    placeholder="e.g. US"
+                    className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3b82f6]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#8b8d97] block mb-1">Currency</label>
+                  <select
+                    value={tradeForm.currency}
+                    onChange={e => setTradeForm({ ...tradeForm, currency: e.target.value })}
+                    className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3b82f6]"
+                  >
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                    <option value="JPY">JPY</option>
+                    <option value="SGD">SGD</option>
+                    <option value="HKD">HKD</option>
+                    <option value="TWD">TWD</option>
+                  </select>
+                </div>
+              </div>
+              {/* Trade total preview */}
+              {tradeForm.quantity && tradeForm.price && (
+                <div className="p-2.5 rounded-lg bg-[#0f1117] border border-[#2a2d3e]">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-[#8b8d97]">Total {tradeForm.action === 'SELL' ? 'Proceeds' : 'Cost'}</span>
+                    <span className={`font-mono font-bold ${tradeForm.action === 'BUY' ? 'text-green-400' : 'text-red-400'}`}>
+                      {tradeForm.currency === 'USD' ? '$' : tradeForm.currency + ' '}
+                      {(parseInt(tradeForm.quantity) * parseFloat(tradeForm.price)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+            {tradeError && <p className="text-red-400 text-xs mt-3">{tradeError}</p>}
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setShowLogTrade(false)}
+                className="flex-1 px-4 py-2 rounded-lg text-xs font-medium text-[#8b8d97] hover:text-white bg-[#0f1117] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLogTrade}
+                disabled={tradeSaving}
+                className={`flex-1 px-4 py-2 rounded-lg text-xs font-medium text-white disabled:opacity-50 transition-colors ${
+                  tradeForm.action === 'BUY'
+                    ? 'bg-green-600 hover:bg-green-500'
+                    : 'bg-red-600 hover:bg-red-500'
+                }`}
+              >
+                {tradeSaving ? 'Saving...' : `${tradeForm.action === 'BUY' ? 'Buy' : 'Sell'}`}
               </button>
             </div>
           </div>
@@ -515,6 +757,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
                         {sortCol === col.key && <span className="ml-0.5 text-[#3b82f6]">{sortDir === 'desc' ? '\u25BC' : '\u25B2'}</span>}
                       </th>
                     ))}
+                    <th className="py-2.5 w-20" />
                   </tr>
                 </thead>
                 <tbody>
@@ -557,6 +800,15 @@ export default function MyPortfolioView({ onSelectTicker }) {
                         </td>
                         <td className="py-2 pl-2">
                           <div className="flex items-center gap-1 opacity-30 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openLogTrade('SELL', h) }}
+                              className="p-1 rounded hover:bg-[#0f1117] text-[#8b8d97] hover:text-red-400"
+                              title="Sell shares"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                              </svg>
+                            </button>
                             <button
                               onClick={(e) => { e.stopPropagation(); openAdjust(h) }}
                               className="p-1 rounded hover:bg-[#0f1117] text-[#8b8d97] hover:text-[#3b82f6]"
@@ -617,7 +869,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
                             <Cell key={s.name} fill={s.name === 'Other' ? '#4b5563' : SECTOR_COLORS[i % SECTOR_COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip content={locked ? () => null : <PieTooltipContent />} />
+                        <Tooltip content={locked ? () => null : <PieTooltipContent />} wrapperStyle={{ outline: 'none', background: 'transparent', border: 'none', boxShadow: 'none' }} />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-3 justify-center">
@@ -659,7 +911,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
                             <Cell key={c.name} fill={COUNTRY_COLORS[i % COUNTRY_COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip content={locked ? () => null : <PieTooltipContent />} />
+                        <Tooltip content={locked ? () => null : <PieTooltipContent />} wrapperStyle={{ outline: 'none', background: 'transparent', border: 'none', boxShadow: 'none' }} />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 justify-center">
@@ -1017,7 +1269,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
           {trades.length === 0 ? (
             <div className="text-center py-12 text-[#8b8d97]">
               <p className="text-lg mb-2">No Trades Recorded</p>
-              <p className="text-xs">Trade SMS messages forwarded via Telegram will automatically appear here.</p>
+              <p className="text-xs">Use "Log Trade" to manually record buys and sells, or forward trade SMS via Telegram.</p>
             </div>
           ) : (
             <table className="w-full text-xs">
@@ -1054,6 +1306,82 @@ export default function MyPortfolioView({ onSelectTicker }) {
             </table>
           )}
         </Card>
+      )}
+
+      {/* ═══ REALIZED P&L TAB ═══ */}
+      {activeTab === 'realized' && (
+        <div className="space-y-6 animate-slide-in">
+          {/* Summary cards */}
+          {realizedData?.summary && (() => {
+            const s = realizedData.summary
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Card>
+                  <div className="text-[#8b8d97] text-[10px] mb-1">Total Realized P&L</div>
+                  <div className={`text-lg font-bold font-mono ${(s.total_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {locked ? mask(true) : `${s.total_pnl >= 0 ? '+' : ''}$${Math.abs(s.total_pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  </div>
+                </Card>
+                <Card>
+                  <div className="text-[#8b8d97] text-[10px] mb-1">Closed Trades</div>
+                  <div className="text-lg font-bold">{s.trade_count || 0}</div>
+                </Card>
+                <Card>
+                  <div className="text-[#8b8d97] text-[10px] mb-1">Winners</div>
+                  <div className="text-lg font-bold text-green-400">{s.winners || 0}</div>
+                </Card>
+                <Card>
+                  <div className="text-[#8b8d97] text-[10px] mb-1">Losers</div>
+                  <div className="text-lg font-bold text-red-400">{s.losers || 0}</div>
+                </Card>
+              </div>
+            )
+          })()}
+
+          {/* Realized P&L records table */}
+          <Card>
+            <h3 className="text-sm font-semibold mb-4">Realized P&L Records</h3>
+            {(!realizedData?.records || realizedData.records.length === 0) ? (
+              <div className="text-center py-12 text-[#8b8d97]">
+                <p className="text-lg mb-2">No Realized P&L Yet</p>
+                <p className="text-xs">Sell trades will automatically track your realized profit/loss here.</p>
+              </div>
+            ) : (
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-[#a0a2ab] border-b border-[#2a2d3e] bg-[#0f1117]/40 text-[10px] uppercase tracking-wider">
+                    <th className="text-left py-2.5 pr-2 font-semibold">Date</th>
+                    <th className="text-left py-2.5 pr-2 font-semibold">Ticker</th>
+                    <th className="text-left py-2.5 pr-2 font-semibold">Name</th>
+                    <th className="text-right py-2.5 pr-2 font-semibold">Shares Sold</th>
+                    <th className="text-right py-2.5 pr-2 font-semibold">Avg Cost</th>
+                    <th className="text-right py-2.5 pr-2 font-semibold">Sell Price</th>
+                    <th className="text-right py-2.5 pr-2 font-semibold">P&L</th>
+                    <th className="text-right py-2.5 font-semibold">Return</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {realizedData.records.map(r => (
+                    <tr key={r.id} className="border-b border-[#2a2d3e]/50 hover:bg-[#252940] transition-colors">
+                      <td className="py-2 pr-2 text-[#8b8d97]">{new Date(r.timestamp).toLocaleDateString()}</td>
+                      <td className="py-2 pr-2 font-mono font-semibold">{r.ticker}</td>
+                      <td className="py-2 pr-2 text-[#8b8d97] max-w-[120px] truncate">{r.name}</td>
+                      <td className="py-2 pr-2 text-right font-mono">{locked ? maskNum(true) : r.quantity.toLocaleString()}</td>
+                      <td className="py-2 pr-2 text-right font-mono">{locked ? mask(true) : `$${fmt(r.buy_avg_cost)}`}</td>
+                      <td className="py-2 pr-2 text-right font-mono">{locked ? mask(true) : `$${fmt(r.sell_price)}`}</td>
+                      <td className={`py-2 pr-2 text-right font-mono font-semibold ${(r.realized_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {locked ? mask(true) : `${r.realized_pnl >= 0 ? '+' : ''}$${Math.abs(r.realized_pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                      </td>
+                      <td className={`py-2 text-right font-mono font-semibold ${(r.realized_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {r.realized_pct >= 0 ? '+' : ''}{r.realized_pct?.toFixed(2)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Card>
+        </div>
       )}
     </div>
   )

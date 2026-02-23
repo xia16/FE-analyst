@@ -16,7 +16,7 @@ import { ReportsView, GenerateReportView } from './views/ReportsView'
 
 // ─── Watchlist Dashboard (was PortfolioView) ──────────────
 
-function WatchlistView({ domainId }) {
+function WatchlistView({ domainId, onSelectTicker }) {
   const { data, loading, error } = useDomainWatchlist(domainId)
 
   if (loading) return <Spinner />
@@ -114,8 +114,8 @@ function WatchlistView({ domainId }) {
             </thead>
             <tbody>
               {sorted.map(p => (
-                <tr key={p.ticker} className="border-b border-[#2a2d3e]/50 hover:bg-[#1a1f2e] transition-colors">
-                  <td className="py-2 pr-2 font-mono font-semibold">{p.ticker}</td>
+                <tr key={p.ticker} className="border-b border-[#2a2d3e]/50 hover:bg-[#1a1f2e] transition-colors cursor-pointer" onClick={() => onSelectTicker && onSelectTicker(p.ticker)}>
+                  <td className="py-2 pr-2 font-mono font-semibold text-blue-400">{p.ticker}</td>
                   <td className="py-2 pr-2 text-[#8b8d97] max-w-[160px] truncate">{p.name}</td>
                   <td className="py-2 pr-2 text-right font-mono">{fmt(p.price)}</td>
                   <td className={`py-2 pr-2 text-right font-mono ${(p.changePct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -595,7 +595,7 @@ export default function App() {
           <MyPortfolioView onSelectTicker={handleSelectTicker} />
         )}
         {activeView === 'watchlist' && activeDomain && (
-          <WatchlistView domainId={activeDomain} />
+          <WatchlistView domainId={activeDomain} onSelectTicker={handleSelectTicker} />
         )}
         {activeView === 'universe' && activeDomain && (
           <UniverseView domainId={activeDomain} domainMeta={domainMeta} onSelectTicker={handleSelectTicker} />

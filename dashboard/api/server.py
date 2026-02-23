@@ -11,6 +11,7 @@ import yaml
 import math
 import time
 import uuid
+import sqlite3
 import subprocess
 import urllib.request
 import urllib.parse
@@ -31,7 +32,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from telegram_bot import (
     parse_trade_message, record_trade, get_holdings, get_trades,
-    get_portfolio_summary, init_db,
+    get_portfolio_summary, get_realized_pnl, get_realized_summary, init_db,
 )
 
 # Project root
@@ -203,6 +204,26 @@ def safe_val(v):
     if isinstance(v, pd.Timestamp):
         return v.isoformat()
     return v
+
+
+def _sanitize_dict(obj):
+    """Replace NaN/Infinity with None recursively for valid JSON."""
+    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize_dict(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_dict(v) for v in obj]
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.floating):
+        f = float(obj)
+        return None if (math.isnan(f) or math.isinf(f)) else round(f, 6)
+    if isinstance(obj, np.ndarray):
+        return _sanitize_dict(obj.tolist())
+    if isinstance(obj, pd.Timestamp):
+        return obj.isoformat()
+    return obj
 
 
 # In-memory cache for quotes
@@ -399,12 +420,26 @@ def get_quote(ticker: str) -> dict:
         return {"ticker": ticker, "name": _name_lookup.get(ticker, ticker), "error": "No price data"}
 
     price = safe_val(closes[-1])
-    # Use second-to-last daily close as previous close (yesterday's close).
-    # chartPreviousClose is the close at the START of the chart range (1mo ago), not yesterday.
-    prev_close = safe_val(closes[-2]) if len(closes) >= 2 else None
 
-    change = round(price - prev_close, 4) if price and prev_close else None
-    change_pct = round((change / prev_close) * 100, 2) if change and prev_close else None
+    # Check if market traded today by looking at the last timestamp
+    timestamps = chart.get("timestamp", [])
+    from datetime import date as _date
+    last_trade_date = None
+    if timestamps:
+        last_trade_date = datetime.utcfromtimestamp(timestamps[-1]).date()
+    today = _date.today()
+    market_open_today = last_trade_date == today if last_trade_date else False
+
+    if market_open_today and len(closes) >= 2:
+        # Market is open today: compare today's close to yesterday's close
+        prev_close = safe_val(closes[-2])
+        change = round(price - prev_close, 4) if price and prev_close else None
+        change_pct = round((change / prev_close) * 100, 2) if change and prev_close else None
+    else:
+        # Market closed (weekend/holiday): no change today
+        prev_close = price  # last close IS the current price
+        change = 0.0
+        change_pct = 0.0
 
     result = {
         "ticker": ticker,
@@ -696,6 +731,35 @@ def get_domain_portfolio(domain_id: str):
 # API Routes — Global (cross-domain)
 # ---------------------------------------------------------------------------
 
+EXCHANGE_COUNTRY = {
+    "NMS": "US", "NYQ": "US", "NGM": "US", "PCX": "US", "BTS": "US", "ASE": "US",
+    "JPX": "Japan", "TYO": "Japan", "TSE": "Japan",
+    "PAR": "France", "AMS": "Netherlands", "GER": "Germany", "FRA": "Germany",
+    "LSE": "UK", "LON": "UK",
+    "HKG": "Hong Kong", "SHH": "China", "SHZ": "China",
+    "KSC": "South Korea", "KOE": "South Korea",
+    "TAI": "Taiwan", "TWO": "Taiwan",
+    "SGX": "Singapore",
+}
+
+
+@app.get("/api/ticker-info/{ticker}")
+def get_ticker_info(ticker: str):
+    """Get name, currency, and country for a ticker using the fast chart API."""
+    quote = get_quote(ticker.upper())
+    chart = _fetch_yahoo_chart(ticker.upper(), range_="5d", interval="1d")
+    meta = chart.get("meta", {}) if chart else {}
+    exchange = meta.get("exchangeName", "")
+    country = EXCHANGE_COUNTRY.get(exchange, "")
+    return {
+        "ticker": ticker.upper(),
+        "name": quote.get("name") or meta.get("shortName") or ticker,
+        "sector": "",
+        "country": country,
+        "currency": meta.get("currency") or quote.get("currency") or "USD",
+    }
+
+
 @app.get("/api/quote/{ticker}")
 def get_single_quote(ticker: str):
     """Get live quote for a single ticker."""
@@ -751,6 +815,225 @@ def trigger_scan():
     """Manually trigger a buy-opportunity scan across all domains."""
     new_alerts = check_buy_opportunities()
     return {"newAlerts": len(new_alerts), "totalAlerts": len(alerts_store), "alerts": new_alerts}
+
+
+# ---------------------------------------------------------------------------
+# Stock Analysis endpoints
+# ---------------------------------------------------------------------------
+
+def _run_analysis_subprocess(ticker: str) -> dict:
+    """Run analysis engines via subprocess and return results."""
+    try:
+        result = subprocess.run(
+            [str(ANALYSIS_PYTHON), str(ANALYSIS_RUNNER), ticker],
+            capture_output=True, text=True, timeout=180,
+            cwd=str(PROJECT_ROOT),
+        )
+        if result.returncode == 0:
+            return json.loads(result.stdout)
+        return {"error": result.stderr or "Analysis failed"}
+    except subprocess.TimeoutExpired:
+        return {"error": "Analysis timed out after 180s"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/analyze/{ticker}")
+def analyze_ticker(ticker: str):
+    """Run all analysis engines for a ticker. Returns raw metrics (cached 30min)."""
+    ticker = ticker.upper()
+
+    # Check in-memory cache
+    if ticker in _analysis_cache:
+        cached_time, cached_data = _analysis_cache[ticker]
+        if datetime.utcnow() - cached_time < ANALYSIS_CACHE_TTL:
+            return cached_data
+
+    # Run analysis subprocess
+    metrics = _run_analysis_subprocess(ticker)
+
+    if "error" not in metrics or metrics.get("composite_score"):
+        # Cache and store in DB
+        _analysis_cache[ticker] = (datetime.utcnow(), metrics)
+        try:
+            conn = sqlite3.connect(ANALYSIS_DB)
+            conn.execute(
+                "INSERT INTO stock_analyses (ticker, analysis_type, data, created_at, status) VALUES (?, 'metrics', ?, ?, 'completed')",
+                (ticker, json.dumps(metrics, default=str), datetime.utcnow().isoformat()),
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+    return metrics
+
+
+@app.post("/api/analyze/{ticker}/thesis")
+async def trigger_thesis(ticker: str):
+    """Trigger a Claude Code analysis session for a ticker."""
+    ticker = ticker.upper()
+
+    # Create pending record in DB
+    conn = sqlite3.connect(ANALYSIS_DB)
+    conn.execute(
+        "INSERT INTO stock_analyses (ticker, analysis_type, data, created_at, status) VALUES (?, 'thesis', '{}', ?, 'pending')",
+        (ticker, datetime.utcnow().isoformat()),
+    )
+    conn.commit()
+    analysis_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.close()
+
+    # Write trigger file for analysis_watcher.py
+    ANALYSIS_QUEUE.mkdir(exist_ok=True)
+    trigger_file = ANALYSIS_QUEUE / f"{analysis_id}_{ticker}.trigger"
+    trigger_file.write_text(json.dumps({
+        "id": analysis_id,
+        "ticker": ticker,
+        "timestamp": datetime.utcnow().isoformat(),
+    }))
+
+    return {"analysis_id": analysis_id, "status": "pending", "ticker": ticker}
+
+
+@app.get("/api/analyze/{ticker}/thesis")
+def get_thesis(ticker: str):
+    """Get the latest LLM thesis for a ticker."""
+    ticker = ticker.upper()
+    conn = sqlite3.connect(ANALYSIS_DB)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT * FROM stock_analyses WHERE ticker=? AND analysis_type='thesis' ORDER BY created_at DESC LIMIT 1",
+        (ticker,),
+    ).fetchone()
+    conn.close()
+
+    if not row:
+        return {"ticker": ticker, "thesis": None, "status": "none"}
+
+    data = json.loads(row["data"]) if row["data"] else {}
+    return {
+        "ticker": ticker,
+        "analysis_id": row["id"],
+        "thesis": data,
+        "status": row["status"],
+        "model": row["model"],
+        "created_at": row["created_at"],
+    }
+
+
+@app.get("/api/analyze/{ticker}/thesis/status")
+def get_thesis_status(ticker: str):
+    """Poll the analysis job status for a ticker."""
+    ticker = ticker.upper()
+    conn = sqlite3.connect(ANALYSIS_DB)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT id, status, created_at FROM stock_analyses WHERE ticker=? AND analysis_type='thesis' ORDER BY created_at DESC LIMIT 1",
+        (ticker,),
+    ).fetchone()
+    conn.close()
+
+    if not row:
+        return {"ticker": ticker, "status": "none"}
+
+    return {
+        "ticker": ticker,
+        "analysis_id": row["id"],
+        "status": row["status"],
+        "created_at": row["created_at"],
+    }
+
+
+@app.get("/api/analyses/recent")
+def get_recent_analyses(limit: int = 20):
+    """Get recent analyses across all tickers."""
+    conn = sqlite3.connect(ANALYSIS_DB)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT id, ticker, analysis_type, created_at, model, status FROM stock_analyses ORDER BY created_at DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    conn.close()
+
+    return {
+        "analyses": [
+            {
+                "id": r["id"],
+                "ticker": r["ticker"],
+                "type": r["analysis_type"],
+                "created_at": r["created_at"],
+                "model": r["model"],
+                "status": r["status"],
+            }
+            for r in rows
+        ]
+    }
+
+
+# ---------------------------------------------------------------------------
+# Portfolio Risk endpoint
+# ---------------------------------------------------------------------------
+
+@app.get("/api/portfolio/risk")
+def portfolio_risk():
+    """Run portfolio risk analysis on current holdings."""
+    holdings = get_holdings()
+    if not holdings:
+        return {"error": "No holdings found"}
+
+    tickers = [h["ticker"] for h in holdings]
+    weights_raw = {}
+    total_invested = sum(h["total_invested"] for h in holdings)
+    if total_invested > 0:
+        for h in holdings:
+            weights_raw[h["ticker"]] = h["total_invested"] / total_invested
+
+    try:
+        sys.path.insert(0, str(PROJECT_ROOT))
+        from src.analysis.portfolio_risk import PortfolioRiskAnalyzer
+        analyzer = PortfolioRiskAnalyzer()
+        portfolio_holdings = [{"ticker": t, "weight": w} for t, w in weights_raw.items()]
+        result = analyzer.analyze(portfolio_holdings)
+        return _sanitize_dict(result)
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Catalyst Calendar endpoint
+# ---------------------------------------------------------------------------
+
+@app.get("/api/catalysts/{ticker}")
+def get_catalysts(ticker: str):
+    """Get upcoming catalysts for a ticker."""
+    try:
+        sys.path.insert(0, str(PROJECT_ROOT))
+        from src.data_sources.catalyst_calendar import CatalystCalendarClient
+        client = CatalystCalendarClient()
+        return client.get_catalysts(ticker.upper())
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Earnings Estimates endpoint
+# ---------------------------------------------------------------------------
+
+@app.get("/api/earnings/{ticker}")
+def get_earnings(ticker: str):
+    """Get earnings estimates and calendar for a ticker."""
+    try:
+        sys.path.insert(0, str(PROJECT_ROOT))
+        from src.data_sources.earnings_estimates import EarningsEstimatesClient
+        client = EarningsEstimatesClient()
+        return {
+            "calendar": client.get_earnings_calendar(ticker.upper()),
+            "revisions": client.get_estimate_revisions(ticker.upper()),
+            "history": client.get_earnings_history(ticker.upper()),
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 
 # ---------------------------------------------------------------------------
@@ -995,6 +1278,125 @@ def remove_position(ticker: str):
     return {"status": "ok", "removed": ticker.upper()}
 
 
+class ManualTrade(BaseModel):
+    action: str  # BUY or SELL
+    ticker: str
+    name: Optional[str] = None
+    quantity: int
+    price: float
+    sector: Optional[str] = ""
+    country: Optional[str] = ""
+    currency: Optional[str] = "USD"
+    portfolio_name: Optional[str] = "SG Brokerage"
+
+
+@app.post("/api/trades/log")
+def log_manual_trade(trade: ManualTrade):
+    """Log a manual BUY or SELL trade with realized P&L tracking."""
+    import sqlite3 as _sql
+    db_path = Path(__file__).parent / "portfolio.db"
+    conn = _sql.connect(db_path)
+    conn.row_factory = _sql.Row
+
+    ticker = trade.ticker.upper()
+    action = trade.action.upper()
+    now = datetime.utcnow().isoformat()
+    total_value = trade.quantity * trade.price
+
+    # Ensure extra columns exist
+    for col in ("sector", "country", "portfolio_name", "currency"):
+        try:
+            conn.execute(f"ALTER TABLE holdings ADD COLUMN {col} TEXT DEFAULT ''")
+        except _sql.OperationalError:
+            pass
+
+    # Ensure realized_pnl table exists
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS realized_pnl (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            ticker TEXT NOT NULL,
+            name TEXT,
+            quantity INTEGER NOT NULL,
+            buy_avg_cost REAL NOT NULL,
+            sell_price REAL NOT NULL,
+            realized_pnl REAL NOT NULL,
+            realized_pct REAL NOT NULL
+        )
+    """)
+
+    # Record trade
+    conn.execute(
+        "INSERT INTO trades (timestamp, action, ticker, name, exchange, quantity, price, total_value, ref_id, raw_message) VALUES (?, ?, ?, ?, '', ?, ?, ?, NULL, 'manual')",
+        (now, action, ticker, trade.name or ticker, trade.quantity, trade.price, total_value),
+    )
+
+    row = conn.execute("SELECT * FROM holdings WHERE ticker = ?", (ticker,)).fetchone()
+
+    if action == "BUY":
+        if row:
+            new_qty = row["quantity"] + trade.quantity
+            new_invested = row["total_invested"] + total_value
+            new_avg = new_invested / new_qty if new_qty > 0 else 0
+            conn.execute(
+                "UPDATE holdings SET quantity=?, avg_cost=?, total_invested=?, name=COALESCE(?, name) WHERE ticker=?",
+                (new_qty, new_avg, new_invested, trade.name, ticker),
+            )
+        else:
+            conn.execute(
+                """INSERT INTO holdings (ticker, name, exchange, quantity, avg_cost, total_invested, sector, country, portfolio_name, currency)
+                   VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?)""",
+                (ticker, trade.name or ticker, trade.quantity, trade.price, total_value,
+                 trade.sector, trade.country, trade.portfolio_name, trade.currency),
+            )
+        conn.commit()
+        conn.close()
+        return {"status": "ok", "action": "BUY", "ticker": ticker, "quantity": trade.quantity, "price": trade.price}
+
+    elif action == "SELL":
+        if not row:
+            conn.close()
+            raise HTTPException(status_code=400, detail=f"You don't hold {ticker}")
+        if trade.quantity > row["quantity"]:
+            conn.close()
+            raise HTTPException(status_code=400, detail=f"Cannot sell {trade.quantity} shares — you only hold {row['quantity']}")
+        realized = None
+        if row:
+            avg_cost = row["avg_cost"]
+            sell_qty = min(trade.quantity, row["quantity"])
+            if sell_qty > 0 and avg_cost > 0:
+                pnl = (trade.price - avg_cost) * sell_qty
+                pnl_pct = ((trade.price - avg_cost) / avg_cost) * 100
+                conn.execute(
+                    "INSERT INTO realized_pnl (timestamp, ticker, name, quantity, buy_avg_cost, sell_price, realized_pnl, realized_pct) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (now, ticker, trade.name or row["name"], sell_qty, avg_cost, trade.price, round(pnl, 2), round(pnl_pct, 2)),
+                )
+                realized = {"pnl": round(pnl, 2), "pnl_pct": round(pnl_pct, 2), "quantity": sell_qty}
+            new_qty = max(0, row["quantity"] - trade.quantity)
+            new_invested = avg_cost * new_qty if new_qty > 0 else 0
+            if new_qty == 0:
+                conn.execute("DELETE FROM holdings WHERE ticker = ?", (ticker,))
+            else:
+                conn.execute(
+                    "UPDATE holdings SET quantity=?, total_invested=? WHERE ticker=?",
+                    (new_qty, new_invested, ticker),
+                )
+        conn.commit()
+        conn.close()
+        return {"status": "ok", "action": "SELL", "ticker": ticker, "quantity": trade.quantity, "price": trade.price, "realized": realized}
+
+    conn.close()
+    raise HTTPException(status_code=400, detail="action must be BUY or SELL")
+
+
+@app.get("/api/realized-pnl")
+def api_get_realized_pnl(limit: int = 100):
+    """Get realized P&L records."""
+    records = get_realized_pnl(limit)
+    summary = get_realized_summary()
+    return {"records": records, "summary": summary}
+
+
 # ---------------------------------------------------------------------------
 # Holdings analytics endpoints
 # ---------------------------------------------------------------------------
@@ -1205,6 +1607,41 @@ PIPELINE_PYTHON = PROJECT_ROOT / "venv" / "bin" / "python"
 PIPELINE_MAIN = PROJECT_ROOT / "main.py"
 
 _jobs: dict[str, dict] = {}
+
+# ---------------------------------------------------------------------------
+# Stock Analysis — SQLite table + in-memory cache
+# ---------------------------------------------------------------------------
+ANALYSIS_DB = Path(__file__).parent / "portfolio.db"
+ANALYSIS_CACHE_TTL = timedelta(minutes=30)
+_analysis_cache: dict[str, tuple[datetime, dict]] = {}
+ANALYSIS_PYTHON = PROJECT_ROOT / "venv" / "bin" / "python"
+ANALYSIS_RUNNER = Path(__file__).parent / "run_analysis.py"
+ANALYSIS_QUEUE = Path(__file__).parent / "analysis_queue"
+
+
+def _init_analysis_table():
+    """Create the stock_analyses table if it doesn't exist."""
+    conn = sqlite3.connect(ANALYSIS_DB)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS stock_analyses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT NOT NULL,
+            analysis_type TEXT NOT NULL,
+            data JSON NOT NULL,
+            created_at TEXT NOT NULL,
+            model TEXT,
+            status TEXT DEFAULT 'completed'
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_analyses_ticker
+        ON stock_analyses(ticker, analysis_type)
+    """)
+    conn.commit()
+    conn.close()
+
+
+_init_analysis_table()
 
 # Ticker pattern: 1-5 uppercase letters, or digits+dot+letter (e.g. 8035.T)
 _TICKER_RE = re.compile(r"[A-Z]{1,5}|\d{4}\.[A-Z]")

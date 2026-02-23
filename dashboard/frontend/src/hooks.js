@@ -109,3 +109,28 @@ export function useBenchmark(period = '3mo', benchmark = 'SPY') {
 export function useMovers() {
   return useFetch('/holdings/movers', { refreshInterval: 30000 })
 }
+
+export function useRealizedPnl(limit = 100) {
+  return useFetch(`/realized-pnl?limit=${limit}`)
+}
+
+// ─── Analysis hooks ──────────────────────────────────────
+
+export function useAnalysis(ticker) {
+  return useFetch(`/analyze/${ticker}`, { enabled: !!ticker })
+}
+
+export function useThesis(ticker) {
+  return useFetch(`/analyze/${ticker}/thesis`, { enabled: !!ticker })
+}
+
+export function useThesisStatus(ticker, poll = false) {
+  return useFetch(`/analyze/${ticker}/thesis/status`, {
+    enabled: !!ticker && poll,
+    refreshInterval: poll ? 3000 : null,
+  })
+}
+
+export function useRecentAnalyses(limit = 20) {
+  return useFetch(`/analyses/recent?limit=${limit}`)
+}

@@ -1,14 +1,19 @@
 """Sentiment data collector and aggregator.
 
-Gathers raw data from news, Reddit, analyst recommendations, and insider
-trades into a structured format. Sentiment interpretation is performed
+Gathers raw data from news, Reddit, analyst recommendations, insider
+trades, ownership data, earnings calendar, and analyst price targets
+into a structured format. Sentiment interpretation is performed
 by the analyst (Claude) when reading the output — no NLP model or API
 call is needed.
 
 The data collector scores a simple heuristic baseline (analyst consensus
-+ insider net buy/sell) for the pipeline composite, but the real analysis
-happens when Claude reads the raw data during report generation.
++ insider net buy/sell + ownership signals) for the pipeline composite,
+but the real analysis happens when Claude reads the raw data during
+report generation.
 """
+
+import yfinance as yf
+import pandas as pd
 
 from src.data_sources.news_sentiment import NewsSentimentClient
 from src.data_sources.alternative_data import AlternativeDataClient
@@ -84,16 +89,35 @@ class SentimentAnalyzer:
             logger.warning("  Institutional ownership fetch failed: %s", e)
         logger.info("  Institutional holders: %d", len(institutional))
 
+        # 6. Insider ownership % and major holders breakdown
+        ownership = self._get_ownership_data(ticker)
+
+        # 7. Earnings calendar
+        earnings_calendar = self._get_earnings_calendar(ticker)
+
+        # 8. Analyst price targets
+        analyst_targets = self._get_analyst_targets(ticker)
+
+        # 9. Short interest data
+        short_interest = self._get_short_interest(ticker)
+
         # Build heuristic score for pipeline composite
-        heuristic_score = self._compute_heuristic(analyst_recs, insider_trades)
+        heuristic_score = self._compute_heuristic(
+            analyst_recs, insider_trades, ownership, short_interest
+        )
 
         return {
             "ticker": ticker,
             "overall_score": heuristic_score,
             "overall_label": self._label_from_score(heuristic_score),
+            # Structured data
+            "ownership": ownership,
+            "earnings_calendar": earnings_calendar,
+            "analyst_targets": analyst_targets,
+            "short_interest": short_interest,
             # Raw data for Claude to interpret
             "raw_data": {
-                "news": news[:30],  # cap to keep context manageable
+                "news": news[:30],
                 "reddit_posts": reddit_posts[:30],
                 "analyst_recommendations": analyst_recs,
                 "insider_trades": insider_trades[:20],
@@ -108,12 +132,187 @@ class SentimentAnalyzer:
             },
         }
 
-    @staticmethod
-    def _compute_heuristic(analyst_recs: list[dict], insider_trades: list[dict]) -> float:
-        """Simple heuristic score from analyst consensus + insider activity.
+    # ------------------------------------------------------------------
+    # Ownership data
+    # ------------------------------------------------------------------
 
-        This provides a baseline for the pipeline composite score. The
-        real sentiment analysis happens when Claude reads the raw data.
+    @staticmethod
+    def _get_ownership_data(ticker: str) -> dict:
+        """Get insider and institutional ownership percentages."""
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info
+            result = {
+                "insider_pct": info.get("heldPercentInsiders"),
+                "institutional_pct": info.get("heldPercentInstitutions"),
+                "float_shares": info.get("floatShares"),
+                "shares_outstanding": info.get("sharesOutstanding"),
+            }
+            # Major holders table
+            try:
+                mh = stock.major_holders
+                if mh is not None and not mh.empty:
+                    holders = {}
+                    for _, row in mh.iterrows():
+                        val = row.iloc[0]
+                        label = str(row.iloc[1]) if len(row) > 1 else ""
+                        if "insider" in label.lower():
+                            holders["insider_label"] = f"{val} {label}"
+                        elif "institution" in label.lower():
+                            holders["institutional_label"] = f"{val} {label}"
+                    result["major_holders"] = holders
+            except Exception:
+                pass
+            return result
+        except Exception as e:
+            logger.warning("Ownership data failed for %s: %s", ticker, e)
+            return {}
+
+    # ------------------------------------------------------------------
+    # Earnings calendar
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _get_earnings_calendar(ticker: str) -> dict:
+        """Get next earnings date and recent earnings history."""
+        try:
+            stock = yf.Ticker(ticker)
+            result = {}
+
+            # Next earnings date from calendar
+            try:
+                cal = stock.calendar
+                if cal is not None:
+                    if isinstance(cal, dict):
+                        dates = cal.get("Earnings Date", [])
+                        if dates:
+                            result["next_earnings_date"] = str(dates[0])
+                            if len(dates) > 1:
+                                result["earnings_date_range_end"] = str(dates[1])
+                    elif isinstance(cal, pd.DataFrame) and not cal.empty:
+                        if "Earnings Date" in cal.index:
+                            result["next_earnings_date"] = str(cal.loc["Earnings Date"].iloc[0])
+            except Exception:
+                pass
+
+            # Recent earnings surprises
+            try:
+                ed = stock.earnings_dates
+                if ed is not None and not ed.empty:
+                    recent = ed.dropna(subset=["Reported EPS"]).head(4)
+                    surprises = []
+                    for idx, row in recent.iterrows():
+                        surprises.append({
+                            "date": str(idx.date()) if hasattr(idx, "date") else str(idx),
+                            "eps_estimate": row.get("EPS Estimate"),
+                            "eps_actual": row.get("Reported EPS"),
+                            "surprise_pct": row.get("Surprise(%)"),
+                        })
+                    result["recent_surprises"] = surprises
+                    # Beat rate
+                    beats = sum(1 for s in surprises if s.get("surprise_pct") and s["surprise_pct"] > 0)
+                    result["beat_rate"] = beats / len(surprises) if surprises else None
+            except Exception:
+                pass
+
+            return result
+        except Exception as e:
+            logger.warning("Earnings calendar failed for %s: %s", ticker, e)
+            return {}
+
+    # ------------------------------------------------------------------
+    # Analyst price targets
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _get_analyst_targets(ticker: str) -> dict:
+        """Get analyst consensus price targets."""
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info
+            result = {
+                "target_mean": info.get("targetMeanPrice"),
+                "target_high": info.get("targetHighPrice"),
+                "target_low": info.get("targetLowPrice"),
+                "target_median": info.get("targetMedianPrice"),
+                "analyst_count": info.get("numberOfAnalystOpinions"),
+                "recommendation": info.get("recommendationKey"),
+                "current_price": info.get("currentPrice", info.get("regularMarketPrice")),
+            }
+            # Compute upside/downside
+            price = result["current_price"]
+            if price and result["target_mean"]:
+                result["upside_pct"] = round(
+                    (result["target_mean"] / price - 1) * 100, 2
+                )
+            if price and result["target_high"]:
+                result["upside_to_high_pct"] = round(
+                    (result["target_high"] / price - 1) * 100, 2
+                )
+            if price and result["target_low"]:
+                result["downside_to_low_pct"] = round(
+                    (result["target_low"] / price - 1) * 100, 2
+                )
+            return result
+        except Exception as e:
+            logger.warning("Analyst targets failed for %s: %s", ticker, e)
+            return {}
+
+    # ------------------------------------------------------------------
+    # Short interest
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _get_short_interest(ticker: str) -> dict:
+        """Get short interest metrics from yfinance."""
+        try:
+            info = yf.Ticker(ticker).info
+            shares_short = info.get("sharesShort")
+            short_ratio = info.get("shortRatio")
+            short_pct = info.get("shortPercentOfFloat")
+            prior_month = info.get("sharesShortPriorMonth")
+
+            result = {
+                "shares_short": shares_short,
+                "short_ratio_days": short_ratio,
+                "short_pct_of_float": short_pct,
+                "shares_short_prior_month": prior_month,
+            }
+
+            # Change vs prior month
+            if shares_short and prior_month and prior_month > 0:
+                result["short_change_pct"] = round(
+                    (shares_short / prior_month - 1) * 100, 2
+                )
+
+            # Signal
+            if short_pct is not None:
+                if short_pct > 0.20:
+                    result["signal"] = "HIGH SHORT INTEREST"
+                elif short_pct > 0.10:
+                    result["signal"] = "ELEVATED"
+                else:
+                    result["signal"] = "NORMAL"
+            else:
+                result["signal"] = "NO DATA"
+
+            return result
+        except Exception as e:
+            logger.warning("Short interest failed for %s: %s", ticker, e)
+            return {"signal": "NO DATA"}
+
+    # ------------------------------------------------------------------
+    # Heuristic scoring
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _compute_heuristic(
+        analyst_recs: list[dict],
+        insider_trades: list[dict],
+        ownership: dict,
+        short_interest: dict,
+    ) -> float:
+        """Heuristic score from analyst consensus + insider + ownership signals.
 
         Returns float from -1.0 to 1.0.
         """
@@ -146,6 +345,22 @@ class SentimentAnalyzer:
                 scores.append(-0.2)
             else:
                 scores.append(0.0)
+
+        # High insider ownership is mildly bullish (skin in the game)
+        insider_pct = ownership.get("insider_pct")
+        if insider_pct is not None:
+            if insider_pct > 0.10:
+                scores.append(0.2)
+            elif insider_pct > 0.03:
+                scores.append(0.1)
+
+        # High short interest is contrarian bearish signal
+        short_pct = short_interest.get("short_pct_of_float")
+        if short_pct is not None:
+            if short_pct > 0.20:
+                scores.append(-0.3)
+            elif short_pct > 0.10:
+                scores.append(-0.15)
 
         if scores:
             return round(sum(scores) / len(scores), 3)

@@ -84,6 +84,19 @@ def init_db():
             total_invested REAL NOT NULL DEFAULT 0
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS realized_pnl (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            ticker TEXT NOT NULL,
+            name TEXT,
+            quantity INTEGER NOT NULL,
+            buy_avg_cost REAL NOT NULL,
+            sell_price REAL NOT NULL,
+            realized_pnl REAL NOT NULL,
+            realized_pct REAL NOT NULL
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -132,8 +145,18 @@ def record_trade(trade: dict) -> dict:
             )
     elif trade["action"] == "SELL":
         if row:
+            sell_qty = min(trade["quantity"], row["quantity"])
+            avg_cost = row["avg_cost"]
+            # Record realized P&L
+            if sell_qty > 0 and avg_cost > 0:
+                pnl = (trade["price"] - avg_cost) * sell_qty
+                pnl_pct = ((trade["price"] - avg_cost) / avg_cost) * 100
+                conn.execute(
+                    "INSERT INTO realized_pnl (timestamp, ticker, name, quantity, buy_avg_cost, sell_price, realized_pnl, realized_pct) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (now, trade["ticker"], trade.get("name", row["name"]), sell_qty, avg_cost, trade["price"], round(pnl, 2), round(pnl_pct, 2)),
+                )
             new_qty = max(0, row["quantity"] - trade["quantity"])
-            new_invested = row["avg_cost"] * new_qty if new_qty > 0 else 0
+            new_invested = avg_cost * new_qty if new_qty > 0 else 0
             if new_qty == 0:
                 conn.execute("DELETE FROM holdings WHERE ticker = ?", (trade["ticker"],))
             else:
@@ -185,6 +208,29 @@ def get_trades(limit: int = 50) -> list[dict]:
     rows = conn.execute("SELECT * FROM trades ORDER BY timestamp DESC LIMIT ?", (limit,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def get_realized_pnl(limit: int = 100) -> list[dict]:
+    """Get realized P&L records."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("SELECT * FROM realized_pnl ORDER BY timestamp DESC LIMIT ?", (limit,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_realized_summary() -> dict:
+    """Get total realized P&L summary."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT COALESCE(SUM(realized_pnl), 0) as total_pnl, COUNT(*) as trade_count, "
+        "COALESCE(SUM(CASE WHEN realized_pnl > 0 THEN 1 ELSE 0 END), 0) as winners, "
+        "COALESCE(SUM(CASE WHEN realized_pnl < 0 THEN 1 ELSE 0 END), 0) as losers "
+        "FROM realized_pnl"
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else {"total_pnl": 0, "trade_count": 0, "winners": 0, "losers": 0}
 
 
 def get_portfolio_summary() -> dict:

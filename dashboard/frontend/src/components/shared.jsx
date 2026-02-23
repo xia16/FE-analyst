@@ -55,3 +55,58 @@ export function Spinner() {
     </div>
   )
 }
+
+// ─── Analysis-specific utilities ─────────────────────────
+
+export const SIGNAL_COLORS = {
+  BULLISH: '#22c55e',
+  BEARISH: '#ef4444',
+  NEUTRAL: '#eab308',
+}
+
+export const RECOMMENDATION_COLORS = {
+  'STRONG BUY': '#22c55e',
+  'BUY': '#4ade80',
+  'HOLD': '#eab308',
+  'SELL': '#f97316',
+  'STRONG SELL': '#ef4444',
+}
+
+export function getScoreColor(score) {
+  if (score >= 75) return '#22c55e'
+  if (score >= 60) return '#4ade80'
+  if (score >= 45) return '#eab308'
+  if (score >= 30) return '#f97316'
+  return '#ef4444'
+}
+
+export function ScoreBar({ label, score, max = 100 }) {
+  const pct = Math.min(100, Math.max(0, (score / max) * 100))
+  const color = getScoreColor(score)
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs mb-1">
+        <span className="text-[#8b8d97]">{label}</span>
+        <span className="font-bold font-mono" style={{ color }}>{fmt(score, 1)}</span>
+      </div>
+      <div className="h-2 bg-[#0f1117] rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all"
+          style={{ width: `${pct}%`, background: color }}
+        />
+      </div>
+    </div>
+  )
+}
+
+export function StatusBadge({ status }) {
+  const colors = {
+    completed: '#22c55e',
+    running: '#3b82f6',
+    pending: '#eab308',
+    failed: '#ef4444',
+    none: '#8b8d97',
+  }
+  const color = colors[status] || '#8b8d97'
+  return <Badge color={color}>{status}</Badge>
+}
