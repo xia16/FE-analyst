@@ -46,10 +46,14 @@ COPY configs/ /app/configs/
 RUN mkdir -p /app/reports/output
 COPY reports/output/ /app/reports/output/
 
+# Analysis engines (src/) — needed by run_analysis.py subprocess
+COPY src/ /app/src/
+
 # Dashboard API source
 COPY dashboard/api/server.py /app/dashboard/api/server.py
 COPY dashboard/api/telegram_bot.py /app/dashboard/api/telegram_bot.py
 COPY dashboard/api/seed_portfolio.py /app/dashboard/api/seed_portfolio.py
+COPY dashboard/api/run_analysis.py /app/dashboard/api/run_analysis.py
 
 # Seed portfolio DB at build time (bakes holdings into image)
 RUN python /app/dashboard/api/seed_portfolio.py

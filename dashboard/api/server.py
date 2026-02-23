@@ -1603,7 +1603,8 @@ def holdings_movers():
 
 REPORTS_DIR = PROJECT_ROOT / "reports" / "output"
 ARCHIVE_DIR = REPORTS_DIR / "_archive"
-PIPELINE_PYTHON = PROJECT_ROOT / "venv" / "bin" / "python"
+_venv_python = PROJECT_ROOT / "venv" / "bin" / "python"
+PIPELINE_PYTHON = _venv_python if _venv_python.exists() else Path(sys.executable)
 PIPELINE_MAIN = PROJECT_ROOT / "main.py"
 
 _jobs: dict[str, dict] = {}
@@ -1614,7 +1615,7 @@ _jobs: dict[str, dict] = {}
 ANALYSIS_DB = Path(__file__).parent / "portfolio.db"
 ANALYSIS_CACHE_TTL = timedelta(minutes=30)
 _analysis_cache: dict[str, tuple[datetime, dict]] = {}
-ANALYSIS_PYTHON = PROJECT_ROOT / "venv" / "bin" / "python"
+ANALYSIS_PYTHON = _venv_python if _venv_python.exists() else Path(sys.executable)
 ANALYSIS_RUNNER = Path(__file__).parent / "run_analysis.py"
 ANALYSIS_QUEUE = Path(__file__).parent / "analysis_queue"
 
