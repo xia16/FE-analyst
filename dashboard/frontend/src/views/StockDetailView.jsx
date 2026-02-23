@@ -187,7 +187,7 @@ export default function StockDetailView({ ticker, setTicker }) {
               {activeTab === 'overview' && <OverviewTab analysis={analysis} quote={quoteData} />}
               {activeTab === 'technicals' && <TechnicalsTab ticker={ticker} />}
               {activeTab === 'fundamentals' && <FundamentalsTab analysis={analysis} />}
-              {activeTab === 'valuation' && <ValuationTab analysis={analysis} />}
+              {activeTab === 'valuation' && <ValuationTab analysis={analysis} thesis={thesis} />}
               {activeTab === 'risk' && <RiskTab analysis={analysis} />}
               {activeTab === 'insider' && <InsiderTab analysis={analysis} />}
               {activeTab === 'sentiment' && <SentimentTab analysis={analysis} />}

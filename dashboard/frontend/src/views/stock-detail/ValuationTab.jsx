@@ -12,25 +12,31 @@ function MetricCell({ label, value, suffix = '', color }) {
   )
 }
 
-export default function ValuationTab({ analysis }) {
+export default function ValuationTab({ analysis, thesis }) {
   const val = analysis?.details?.valuation
   if (!val) return <div className="text-[#8b8d97] text-center py-8">No valuation data available.</div>
 
   const dcf = val.dcf || {}
   const comps = val.comparables || {}
   const sensitivity = dcf.sensitivity || {}
-  const scenarios = dcf.scenarios || {}
+  const mechanicalScenarios = dcf.scenarios || {}
   const wacc = dcf.wacc_breakdown || {}
   const projection = dcf.two_stage_projection || []
   const tvMethods = dcf.terminal_value_methods || {}
   const reverseDcf = dcf.reverse_dcf || {}
   const analyst = dcf.analyst_targets || {}
-  const probWeighted = dcf.probability_weighted_fair_value
-  const riskReward = dcf.risk_reward_ratio
   const valueBreakdown = dcf.value_breakdown || {}
   const composite = dcf.composite || {}
   const methodFVs = composite.method_fair_values || {}
   const methodWeights = composite.method_weights || {}
+
+  // LLM-validated scenarios take priority over mechanical
+  const llmScenarios = thesis?.data?.llm_scenarios
+  const hasLLMScenarios = llmScenarios?.source === 'llm_validated' && llmScenarios?.scenarios
+  const scenarios = hasLLMScenarios ? llmScenarios.scenarios : mechanicalScenarios
+  const probWeighted = hasLLMScenarios ? llmScenarios.probability_weighted : dcf.probability_weighted_fair_value
+  const riskReward = hasLLMScenarios ? llmScenarios.risk_reward : dcf.risk_reward_ratio
+  const scenarioPrice = hasLLMScenarios ? llmScenarios.current_price : dcf.current_price
 
   // Use composite fair value as primary if available, else fall back to DCF
   const primaryFV = composite.composite_fair_value || dcf.intrinsic_per_share || dcf.fair_value_per_share
@@ -482,34 +488,60 @@ export default function ValuationTab({ analysis }) {
       {/* Probability-Weighted Scenarios */}
       {Object.keys(scenarios).length > 0 && (
         <Card>
-          <h3 className="text-sm font-semibold mb-3">Probability-Weighted Scenarios</h3>
+          <div className="flex items-center gap-3 mb-3">
+            <h3 className="text-sm font-semibold">Probability-Weighted Scenarios</h3>
+            <Badge color={hasLLMScenarios ? '#3b82f6' : '#6b7280'}>
+              {hasLLMScenarios ? 'LLM-Validated' : 'Mechanical'}
+            </Badge>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {['bear', 'base', 'bull'].map(s => {
               const sc = scenarios[s]
               if (!sc) return null
               const color = s === 'bull' ? '#22c55e' : s === 'bear' ? '#ef4444' : '#3b82f6'
+              const icon = s === 'bull' ? '\uD83D\uDCC8' : s === 'bear' ? '\uD83D\uDCC9' : '\u2696\uFE0F'
               const prob = sc.probability != null ? `${(sc.probability * 100).toFixed(0)}%` : ''
+              const refPrice = scenarioPrice || dcf.current_price
               return (
-                <div key={s} className="p-3 rounded-lg border" style={{ borderColor: `${color}30`, background: `${color}08` }}>
+                <div key={s} className="p-4 rounded-lg border" style={{ borderColor: `${color}30`, background: `${color}08` }}>
                   <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm">{icon}</span>
                     <Badge color={color}>{s.toUpperCase()}</Badge>
                     {prob && <span className="text-[10px] text-[#8b8d97]">({prob} weight)</span>}
                   </div>
-                  <div className="text-lg font-bold font-mono mb-2" style={{ color }}>
-                    ${fmt(sc.intrinsic_per_share ?? sc.fair_value_per_share, 2)}
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <div className="text-xl font-bold font-mono" style={{ color }}>
+                      ${fmt(sc.intrinsic_per_share ?? sc.fair_value_per_share, 2)}
+                    </div>
+                    {refPrice && sc.intrinsic_per_share != null && (
+                      <div className="text-xs font-mono" style={{ color }}>
+                        {sc.intrinsic_per_share > refPrice ? '+' : ''}
+                        {fmt(((sc.intrinsic_per_share - refPrice) / refPrice) * 100, 1)}%
+                      </div>
+                    )}
                   </div>
+                  {/* LLM Narrative */}
+                  {sc.narrative && (
+                    <div className="text-[11px] text-[#c8c9ce] italic mb-3 leading-relaxed border-l-2 pl-2" style={{ borderColor: `${color}40` }}>
+                      {sc.narrative}
+                    </div>
+                  )}
                   <div className="space-y-1 text-[10px] text-[#8b8d97]">
                     <div>Growth: {fmt((sc.growth_rate || 0) * 100, 1)}%</div>
                     <div>WACC: {fmt((sc.wacc || sc.discount_rate || 0) * 100, 1)}%</div>
                     <div>Terminal: {fmt((sc.terminal_growth || 0) * 100, 1)}%</div>
                     {sc.enterprise_value != null && <div>EV: {fmtCurrency(sc.enterprise_value)}</div>}
-                    {dcf.current_price && sc.intrinsic_per_share != null && (
-                      <div className="mt-1 font-mono" style={{ color }}>
-                        {sc.intrinsic_per_share > dcf.current_price ? '+' : ''}
-                        {fmt(((sc.intrinsic_per_share - dcf.current_price) / dcf.current_price) * 100, 1)}% vs current
-                      </div>
-                    )}
                   </div>
+                  {/* Key Drivers */}
+                  {sc.key_drivers && sc.key_drivers.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-3">
+                      {sc.key_drivers.map((d, i) => (
+                        <span key={i} className="text-[9px] px-1.5 py-0.5 rounded-full border" style={{ borderColor: `${color}30`, color: `${color}cc`, background: `${color}10` }}>
+                          {d}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -519,9 +551,9 @@ export default function ValuationTab({ analysis }) {
             <div className="mt-3 flex items-center gap-4 bg-[#0f1117] rounded-lg p-3">
               <div className="text-xs text-[#8b8d97]">Probability-Weighted Fair Value:</div>
               <div className="text-lg font-bold font-mono text-purple-400">${fmt(probWeighted, 2)}</div>
-              {dcf.current_price && (
-                <div className={`text-xs font-mono ${probWeighted > dcf.current_price ? 'text-green-400' : 'text-red-400'}`}>
-                  ({probWeighted > dcf.current_price ? '+' : ''}{fmt(((probWeighted - dcf.current_price) / dcf.current_price) * 100, 1)}%)
+              {(scenarioPrice || dcf.current_price) && (
+                <div className={`text-xs font-mono ${probWeighted > (scenarioPrice || dcf.current_price) ? 'text-green-400' : 'text-red-400'}`}>
+                  ({probWeighted > (scenarioPrice || dcf.current_price) ? '+' : ''}{fmt(((probWeighted - (scenarioPrice || dcf.current_price)) / (scenarioPrice || dcf.current_price)) * 100, 1)}%)
                 </div>
               )}
               {riskReward != null && (

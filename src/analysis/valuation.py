@@ -559,6 +559,130 @@ class ValuationAnalyzer:
         return scenarios, prob_weighted, risk_reward
 
     # ------------------------------------------------------------------
+    # LLM-validated scenario analysis
+    # ------------------------------------------------------------------
+
+    def scenario_analysis_from_assumptions(
+        self, ticker: str, assumptions: dict,
+    ) -> dict:
+        """Compute DCF scenarios using LLM-provided assumptions.
+
+        Instead of mechanical multipliers (bull=1.3x, bear=0.7x), this method
+        takes critically-reasoned assumptions from Claude with specific growth
+        rates, WACC adjustments, terminal growth, narratives, and key drivers.
+
+        Args:
+            ticker: Stock ticker
+            assumptions: Dict with 'bull', 'base', 'bear' keys, each containing:
+                - growth_rate: absolute Stage 1 growth rate
+                - terminal_growth: long-run growth rate
+                - wacc_adjustment: relative to computed WACC (e.g., -0.01)
+                - probability: weight for this scenario
+                - narrative: 1-2 sentence thesis
+                - key_drivers: list of key factors
+
+        Returns:
+            Dict with scenarios, probability_weighted, risk_reward, source.
+        """
+        import yfinance as yf
+
+        # Get base inputs
+        current_fcf, warnings = self._get_smoothed_fcf(ticker)
+        if current_fcf <= 0:
+            logger.warning("Negative/zero FCF for %s — LLM scenarios may be unreliable", ticker)
+            # Try owner earnings as fallback
+            try:
+                oe, _, _ = self._get_owner_earnings(ticker)
+                if oe > 0:
+                    current_fcf = oe
+                    warnings.append("Using owner earnings instead of FCF for scenario analysis")
+            except Exception:
+                pass
+            if current_fcf <= 0:
+                return {
+                    "error": "No positive cash flow for scenario analysis",
+                    "source": "llm_validated",
+                }
+
+        wacc_info = self._compute_wacc(ticker)
+        base_wacc = wacc_info["wacc"]
+
+        net_debt_info = self._net_debt_adjustment(ticker)
+        net_debt = net_debt_info["net_debt"]
+
+        info = yf.Ticker(ticker).info
+        shares = info.get("impliedSharesOutstanding") or info.get("sharesOutstanding", 1) or 1
+        current_price = info.get("currentPrice", info.get("regularMarketPrice", 0)) or 0
+
+        stage1_years = 5
+        stage2_years = 5
+        total_years = stage1_years + stage2_years
+
+        scenarios = {}
+
+        for name in ["bull", "base", "bear"]:
+            sc = assumptions[name]
+            g = sc["growth_rate"]
+            tg = sc["terminal_growth"]
+            w = base_wacc + sc["wacc_adjustment"]
+
+            # Safety: WACC must exceed terminal growth
+            if w <= tg:
+                w = tg + 0.02
+
+            # Two-stage DCF projection
+            projections = self._project_two_stage_fcf(
+                current_fcf, g, tg, stage1_years, stage2_years
+            )
+            pv_fcfs = sum(
+                p["fcf"] / (1 + w) ** p["year"] for p in projections
+            )
+            final_fcf = projections[-1]["fcf"]
+            tv = final_fcf * (1 + tg) / (w - tg)
+            pv_tv = tv / (1 + w) ** total_years
+            ev = pv_fcfs + pv_tv
+            equity = ev - net_debt
+            per_share = equity / shares if shares > 0 else 0
+
+            scenarios[name] = {
+                "growth_rate": round(g, 4),
+                "wacc": round(w, 4),
+                "terminal_growth": round(tg, 4),
+                "enterprise_value": round(ev, 0),
+                "equity_value": round(equity, 0),
+                "intrinsic_per_share": round(per_share, 2),
+                "probability": sc["probability"],
+                "narrative": sc.get("narrative", ""),
+                "key_drivers": sc.get("key_drivers", []),
+            }
+
+        # Probability-weighted fair value
+        prob_weighted = sum(
+            s["intrinsic_per_share"] * s["probability"]
+            for s in scenarios.values()
+        )
+
+        # Risk/reward ratio
+        risk_reward = None
+        if current_price and current_price > 0:
+            upside = scenarios["bull"]["intrinsic_per_share"] - current_price
+            downside = current_price - scenarios["bear"]["intrinsic_per_share"]
+            if downside > 0:
+                risk_reward = round(upside / downside, 2)
+            elif downside <= 0 and upside > 0:
+                risk_reward = 99.0
+
+        return {
+            "scenarios": scenarios,
+            "probability_weighted": round(prob_weighted, 2),
+            "risk_reward": risk_reward,
+            "source": "llm_validated",
+            "base_wacc": round(base_wacc, 4),
+            "current_fcf": round(current_fcf, 0),
+            "current_price": current_price,
+        }
+
+    # ------------------------------------------------------------------
     # Analyst price targets
     # ------------------------------------------------------------------
 

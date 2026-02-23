@@ -117,7 +117,118 @@ Be specific — cite actual numbers from the data (e.g., "RSI at 39 suggests ove
 
 At the very end of your report, on its own line, include:
 **Recommendation: BUY|HOLD|SELL | Conviction: HIGH|MEDIUM|LOW**
+
+## Scenario Assumptions (REQUIRED)
+
+After your markdown report, you MUST output the following block with your bear/base/bull DCF scenario assumptions. Think critically about what specific growth rates, discount rates, and terminal growth rates are appropriate for THIS specific company. Do NOT use generic multipliers (like 1.3x growth for bull) — reason about company-specific catalysts, risks, and competitive dynamics for each scenario.
+
+For each scenario, provide:
+- `growth_rate`: Your estimated 5-year revenue/FCF growth rate (decimal, e.g. 0.15 = 15%). This should reflect your analysis of the company's specific growth drivers.
+- `terminal_growth`: Long-run sustainable growth (decimal, typically 0.02-0.04 for most companies)
+- `wacc_adjustment`: Adjustment RELATIVE to the base WACC (decimal, e.g. -0.01 means 1% lower WACC for bull case due to better credit conditions, +0.015 means 1.5% higher for bear case)
+- `probability`: Your estimated probability weight (must sum to 1.0 across all three)
+- `narrative`: 1-2 sentence thesis explaining WHY this scenario would materialize. Be specific about catalysts and risks.
+- `key_drivers`: List of 2-4 key factors that would drive this scenario
+
+Output the block exactly in this format:
+
+<!-- SCENARIO_ASSUMPTIONS -->
+{{
+  "bull": {{
+    "growth_rate": 0.XX,
+    "terminal_growth": 0.0X,
+    "wacc_adjustment": -0.0X,
+    "probability": 0.XX,
+    "narrative": "Specific thesis for the bull case",
+    "key_drivers": ["driver1", "driver2", "driver3"]
+  }},
+  "base": {{
+    "growth_rate": 0.XX,
+    "terminal_growth": 0.0X,
+    "wacc_adjustment": 0.00,
+    "probability": 0.XX,
+    "narrative": "Specific thesis for the base case",
+    "key_drivers": ["driver1", "driver2"]
+  }},
+  "bear": {{
+    "growth_rate": 0.XX,
+    "terminal_growth": 0.0X,
+    "wacc_adjustment": 0.0X,
+    "probability": 0.XX,
+    "narrative": "Specific thesis for the bear case",
+    "key_drivers": ["driver1", "driver2", "driver3"]
+  }}
+}}
+<!-- /SCENARIO_ASSUMPTIONS -->
 """
+
+
+def _extract_scenario_assumptions(text: str) -> dict | None:
+    """Extract LLM-validated scenario assumptions from Claude's output.
+
+    Looks for the <!-- SCENARIO_ASSUMPTIONS --> block, parses JSON, validates
+    required fields, clamps values to sane ranges, and normalizes probabilities.
+    Returns None if parsing fails (graceful fallback to mechanical scenarios).
+    """
+    match = re.search(
+        r"<!--\s*SCENARIO_ASSUMPTIONS\s*-->\s*(.*?)\s*<!--\s*/SCENARIO_ASSUMPTIONS\s*-->",
+        text, re.DOTALL,
+    )
+    if not match:
+        logger.info("No SCENARIO_ASSUMPTIONS block found in Claude output")
+        return None
+
+    raw = match.group(1).strip()
+    try:
+        assumptions = json.loads(raw)
+    except json.JSONDecodeError as e:
+        logger.warning("Failed to parse scenario JSON: %s", e)
+        return None
+
+    required_scenarios = {"bull", "base", "bear"}
+    if not required_scenarios.issubset(assumptions.keys()):
+        logger.warning("Missing scenarios: %s", required_scenarios - assumptions.keys())
+        return None
+
+    required_fields = {"growth_rate", "terminal_growth", "wacc_adjustment", "probability", "narrative", "key_drivers"}
+
+    for scenario_name in required_scenarios:
+        sc = assumptions[scenario_name]
+        if not isinstance(sc, dict):
+            logger.warning("Scenario '%s' is not a dict", scenario_name)
+            return None
+        missing = required_fields - sc.keys()
+        if missing:
+            logger.warning("Scenario '%s' missing fields: %s", scenario_name, missing)
+            return None
+
+        # Clamp values to sane ranges
+        sc["growth_rate"] = max(-0.20, min(0.50, float(sc["growth_rate"])))
+        sc["terminal_growth"] = max(0.01, min(0.05, float(sc["terminal_growth"])))
+        sc["wacc_adjustment"] = max(-0.03, min(0.03, float(sc["wacc_adjustment"])))
+        sc["probability"] = max(0.10, min(0.60, float(sc["probability"])))
+
+        # Ensure key_drivers is a list
+        if not isinstance(sc.get("key_drivers"), list):
+            sc["key_drivers"] = []
+
+        # Ensure narrative is a string
+        if not isinstance(sc.get("narrative"), str):
+            sc["narrative"] = ""
+
+    # Normalize probabilities to sum to 1.0
+    total_prob = sum(assumptions[s]["probability"] for s in required_scenarios)
+    if total_prob > 0:
+        for s in required_scenarios:
+            assumptions[s]["probability"] = round(assumptions[s]["probability"] / total_prob, 3)
+
+    logger.info(
+        "Extracted LLM scenario assumptions: bull=%.1f%% growth, base=%.1f%%, bear=%.1f%%",
+        assumptions["bull"]["growth_rate"] * 100,
+        assumptions["base"]["growth_rate"] * 100,
+        assumptions["bear"]["growth_rate"] * 100,
+    )
+    return assumptions
 
 
 def update_status(analysis_id: int, status: str, data: dict | None = None, model: str | None = None):
@@ -199,11 +310,46 @@ def run_analysis(trigger: dict):
                     r'\*\*Recommendation:\s*(BUY|HOLD|SELL)\s*\|\s*Conviction:\s*(HIGH|MEDIUM|LOW)\*\*',
                     text, re.IGNORECASE,
                 )
+
+                # Strip scenario block from displayed markdown (keep it clean)
+                display_markdown = re.sub(
+                    r"\s*<!--\s*SCENARIO_ASSUMPTIONS\s*-->.*?<!--\s*/SCENARIO_ASSUMPTIONS\s*-->\s*",
+                    "", text, flags=re.DOTALL,
+                ).strip()
+
                 thesis_data = {
-                    "markdown": text,
+                    "markdown": display_markdown,
                     "recommendation": rec_match.group(1).upper() if rec_match else "HOLD",
                     "conviction": rec_match.group(2).upper() if rec_match else "MEDIUM",
                 }
+
+                # Extract and recompute LLM-validated scenarios
+                scenario_assumptions = _extract_scenario_assumptions(text)
+                if scenario_assumptions:
+                    try:
+                        logger.info("Recomputing DCF with LLM assumptions for %s...", ticker)
+                        import sys
+                        sys.path.insert(0, str(PROJECT_ROOT))
+                        from src.analysis.valuation import ValuationAnalyzer
+                        va = ValuationAnalyzer()
+                        llm_scenarios = va.scenario_analysis_from_assumptions(
+                            ticker, scenario_assumptions
+                        )
+                        if "error" not in llm_scenarios:
+                            thesis_data["llm_scenarios"] = llm_scenarios
+                            logger.info(
+                                "LLM scenarios computed for %s: bear=$%.2f, base=$%.2f, bull=$%.2f (PW=$%.2f)",
+                                ticker,
+                                llm_scenarios["scenarios"]["bear"]["intrinsic_per_share"],
+                                llm_scenarios["scenarios"]["base"]["intrinsic_per_share"],
+                                llm_scenarios["scenarios"]["bull"]["intrinsic_per_share"],
+                                llm_scenarios["probability_weighted"],
+                            )
+                        else:
+                            logger.warning("LLM scenario recomputation failed: %s", llm_scenarios.get("error"))
+                    except Exception as e:
+                        logger.error("Failed to recompute LLM scenarios for %s: %s", ticker, e)
+
                 update_status(analysis_id, "completed", thesis_data, "claude-code")
                 logger.info("Thesis completed for %s (markdown format)", ticker)
         else:
