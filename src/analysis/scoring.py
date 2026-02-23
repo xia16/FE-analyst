@@ -88,13 +88,25 @@ class StockScorer:
             logger.error("Fundamental analysis failed: %s", e)
             scores["fundamental"] = 50
 
-        # Valuation score (0-100): DCF 60% + Comps 25% + Quality 15%
+        # Valuation score (0-100): Composite DCF 60% + Comps 25% + Quality 15%
         try:
             dcf = self.val.dcf_valuation(ticker)
             comps = self.val.comparable_valuation(ticker)
 
-            # DCF score (60% weight)
-            mos = dcf.get("margin_of_safety_pct", 0)
+            # Multi-method composite fair value
+            composite = {}
+            try:
+                composite = self.val.composite_fair_value(ticker)
+                dcf["composite"] = composite
+            except Exception as e:
+                logger.warning("Composite valuation failed for %s: %s", ticker, e)
+
+            # Use composite MOS for scoring if available, else fall back to FCF DCF
+            if composite.get("margin_of_safety_pct") is not None:
+                mos = composite["margin_of_safety_pct"]
+            else:
+                mos = dcf.get("margin_of_safety_pct", 0)
+
             mos = max(-50, min(50, mos))  # Clamp MOS so score stays 0-100 without extremes
             dcf_score = max(0, min(100, 50 + mos))
 

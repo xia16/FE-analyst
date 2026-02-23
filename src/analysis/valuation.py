@@ -615,6 +615,441 @@ class ValuationAnalyzer:
         return None
 
     # ------------------------------------------------------------------
+    # Owner Earnings helper (OCF - maintenance capex)
+    # ------------------------------------------------------------------
+
+    def _get_owner_earnings(self, ticker: str) -> tuple[float, dict, list[str]]:
+        """Compute Owner Earnings = Operating Cash Flow - Maintenance CapEx.
+
+        For capex-heavy growth companies (AMZN, GOOG, META), total capex includes
+        massive growth investment (new data centers, logistics networks).  Using
+        raw FCF (OCF - total capex) dramatically undervalues these companies.
+
+        Maintenance capex is estimated as:
+          1. Depreciation & Amortization (best proxy for replacement cost)
+          2. If D&A unavailable, 50% of total capex (conservative assumption)
+
+        Returns (owner_earnings, breakdown_dict, warnings).
+        """
+        warnings: list[str] = []
+        breakdown = {}
+
+        try:
+            cf = self.fundamentals.get_cash_flow(ticker)
+            inc = self.fundamentals.get_income_statement(ticker)
+
+            if cf.empty:
+                return 0.0, {}, ["No cash flow data for owner earnings"]
+
+            # Operating cash flow
+            ocf = 0.0
+            for key in ["Operating Cash Flow", "Cash Flow From Continuing Operating Activities"]:
+                if key in cf.index:
+                    val = cf.loc[key].iloc[0]
+                    if pd.notna(val):
+                        ocf = float(val)
+                        break
+
+            if ocf <= 0:
+                return 0.0, {}, ["Operating cash flow is negative or zero"]
+
+            # Total capex (negative in financial statements)
+            total_capex = 0.0
+            for key in ["Capital Expenditure", "Capital Expenditures"]:
+                if key in cf.index:
+                    val = cf.loc[key].iloc[0]
+                    if pd.notna(val):
+                        total_capex = abs(float(val))
+                        break
+
+            # Depreciation & Amortization (proxy for maintenance capex)
+            da = 0.0
+            for key in ["Depreciation And Amortization", "Reconciled Depreciation",
+                        "Depreciation Amortization Depletion"]:
+                if key in cf.index:
+                    val = cf.loc[key].iloc[0]
+                    if pd.notna(val):
+                        da = abs(float(val))
+                        break
+            if da == 0 and not inc.empty:
+                for key in ["Depreciation And Amortization", "Reconciled Depreciation"]:
+                    if key in inc.index:
+                        val = inc.loc[key].iloc[0]
+                        if pd.notna(val):
+                            da = abs(float(val))
+                            break
+
+            # Estimate maintenance capex
+            if da > 0:
+                maintenance_capex = da
+                growth_capex = max(0, total_capex - da)
+                capex_method = "D&A proxy"
+            elif total_capex > 0:
+                maintenance_capex = total_capex * 0.50
+                growth_capex = total_capex * 0.50
+                capex_method = "50% total capex estimate"
+                warnings.append("D&A unavailable; estimated maintenance capex at 50% of total")
+            else:
+                maintenance_capex = 0
+                growth_capex = 0
+                capex_method = "no capex data"
+
+            owner_earnings = ocf - maintenance_capex
+            raw_fcf = ocf - total_capex
+
+            # Compute growth capex ratio — if >50% of capex is growth, flag it
+            growth_capex_ratio = growth_capex / total_capex if total_capex > 0 else 0
+            if growth_capex_ratio > 0.3:
+                warnings.append(
+                    f"~{growth_capex_ratio:.0%} of capex is growth investment "
+                    f"(${growth_capex/1e9:.1f}B growth vs ${maintenance_capex/1e9:.1f}B maintenance)"
+                )
+
+            breakdown = {
+                "operating_cash_flow": round(ocf, 0),
+                "total_capex": round(total_capex, 0),
+                "depreciation_amortization": round(da, 0),
+                "maintenance_capex": round(maintenance_capex, 0),
+                "growth_capex": round(growth_capex, 0),
+                "growth_capex_ratio": round(growth_capex_ratio, 3),
+                "owner_earnings": round(owner_earnings, 0),
+                "raw_fcf": round(raw_fcf, 0),
+                "capex_method": capex_method,
+            }
+
+            return owner_earnings, breakdown, warnings
+
+        except Exception as e:
+            logger.warning("Owner earnings failed for %s: %s", ticker, e)
+            return 0.0, {}, [f"Owner earnings error: {e}"]
+
+    # ------------------------------------------------------------------
+    # Earnings Power Value (EPV)
+    # ------------------------------------------------------------------
+
+    def _earnings_power_value(self, ticker: str) -> dict:
+        """Compute Earnings Power Value = Normalized EBIT × (1-t) / WACC.
+
+        EPV values a company based on its current earnings power without
+        assuming any growth.  Useful as a floor valuation and for companies
+        where FCF is distorted by investment cycles.
+        """
+        import yfinance as yf
+
+        try:
+            inc = self.fundamentals.get_income_statement(ticker)
+            if inc.empty:
+                return {"error": "No income statement data"}
+
+            # Get EBIT (operating income) — average of available years for normalization
+            ebit_vals = []
+            for key in ["EBIT", "Operating Income"]:
+                if key in inc.index:
+                    row = inc.loc[key].dropna()
+                    ebit_vals = [float(v) for v in row if pd.notna(v) and float(v) > 0]
+                    break
+
+            if not ebit_vals:
+                return {"error": "No positive EBIT data available"}
+
+            # Normalize: use average of last 3 years to smooth cyclical effects
+            normalized_ebit = float(np.mean(ebit_vals[:3]))
+
+            # WACC and tax rate
+            wacc_info = self._compute_wacc(ticker)
+            wacc = wacc_info["wacc"]
+            tax_rate = self._estimate_tax_rate(ticker)
+
+            if wacc <= 0:
+                return {"error": "Invalid WACC for EPV"}
+
+            # EPV = NOPAT / WACC
+            nopat = normalized_ebit * (1 - tax_rate)
+            epv_enterprise = nopat / wacc
+
+            # Subtract net debt to get equity value
+            net_debt_info = self._net_debt_adjustment(ticker)
+            net_debt = net_debt_info["net_debt"]
+            epv_equity = epv_enterprise - net_debt
+
+            # Per share
+            info = yf.Ticker(ticker).info
+            shares = info.get("impliedSharesOutstanding") or info.get("sharesOutstanding", 1) or 1
+            epv_per_share = epv_equity / shares
+
+            return {
+                "normalized_ebit": round(normalized_ebit, 0),
+                "nopat": round(nopat, 0),
+                "wacc": round(wacc, 4),
+                "tax_rate": round(tax_rate, 4),
+                "enterprise_value": round(epv_enterprise, 0),
+                "net_debt": round(net_debt, 0),
+                "equity_value": round(epv_equity, 0),
+                "per_share": round(epv_per_share, 2),
+                "years_averaged": min(3, len(ebit_vals)),
+                "note": "No-growth valuation based on current earnings power",
+            }
+
+        except Exception as e:
+            logger.warning("EPV failed for %s: %s", ticker, e)
+            return {"error": f"EPV calculation failed: {e}"}
+
+    # ------------------------------------------------------------------
+    # Owner Earnings DCF (alternative to FCF-based DCF)
+    # ------------------------------------------------------------------
+
+    def owner_earnings_dcf(self, ticker: str) -> dict:
+        """DCF using Owner Earnings (OCF - maintenance capex) instead of FCF.
+
+        This method is more appropriate for capex-heavy growth companies
+        (AMZN, GOOG, META, MSFT) where a large portion of capex is growth
+        investment that FCF-based DCF penalizes.
+
+        Uses the same two-stage model, WACC, and terminal value logic as
+        the standard DCF but with owner earnings as the cash flow input.
+        """
+        import yfinance as yf
+
+        owner_earnings, oe_breakdown, warnings = self._get_owner_earnings(ticker)
+
+        if owner_earnings <= 0:
+            return {
+                "error": "Owner earnings non-positive",
+                "breakdown": oe_breakdown,
+                "warnings": warnings,
+            }
+
+        # Growth and WACC
+        growth_info = self._estimate_growth_rate(ticker)
+        growth_rate = growth_info["growth_rate"]
+
+        wacc_info = self._compute_wacc(ticker)
+        discount_rate = wacc_info["wacc"]
+        terminal_growth = wacc_info["terminal_growth"]
+
+        if discount_rate <= terminal_growth:
+            discount_rate = terminal_growth + 0.02
+            warnings.append(f"WACC adjusted to {discount_rate:.2%}")
+
+        # Two-stage projection
+        stage1_years = 5
+        stage2_years = 5
+        total_years = stage1_years + stage2_years
+
+        projections = self._project_two_stage_fcf(
+            owner_earnings, growth_rate, terminal_growth, stage1_years, stage2_years
+        )
+
+        pv_fcfs = sum(p["fcf"] / (1 + discount_rate) ** p["year"] for p in projections)
+        final_oe = projections[-1]["fcf"]
+
+        # Terminal value (Gordon Growth only — more appropriate for OE)
+        terminal_value = final_oe * (1 + terminal_growth) / (discount_rate - terminal_growth)
+        pv_terminal = terminal_value / (1 + discount_rate) ** total_years
+
+        enterprise_value = pv_fcfs + pv_terminal
+
+        # Net debt adjustment
+        net_debt_info = self._net_debt_adjustment(ticker)
+        net_debt = net_debt_info["net_debt"]
+        equity_value = enterprise_value - net_debt
+
+        # Per share
+        info = yf.Ticker(ticker).info
+        shares = info.get("impliedSharesOutstanding") or info.get("sharesOutstanding", 1) or 1
+        intrinsic_per_share = equity_value / shares
+        current_price = info.get("currentPrice", info.get("regularMarketPrice", 0)) or 0
+
+        margin_of_safety = (
+            (intrinsic_per_share - current_price) / intrinsic_per_share * 100
+            if intrinsic_per_share > 0
+            else -100
+        )
+
+        return {
+            "method": "Owner Earnings DCF",
+            "owner_earnings": round(owner_earnings, 0),
+            "owner_earnings_breakdown": oe_breakdown,
+            "growth_rate": round(growth_rate, 4),
+            "discount_rate": round(discount_rate, 4),
+            "terminal_growth": round(terminal_growth, 4),
+            "enterprise_value": round(enterprise_value, 0),
+            "equity_value": round(equity_value, 0),
+            "net_debt": round(net_debt, 0),
+            "intrinsic_per_share": round(intrinsic_per_share, 2),
+            "current_price": current_price,
+            "margin_of_safety_pct": round(margin_of_safety, 2),
+            "warnings": warnings,
+        }
+
+    # ------------------------------------------------------------------
+    # Composite Fair Value (multi-method)
+    # ------------------------------------------------------------------
+
+    def composite_fair_value(self, ticker: str) -> dict:
+        """Compute a weighted composite fair value from multiple methods.
+
+        Methods and default weights:
+          - FCF DCF (standard):    30%  (penalized for high-capex companies)
+          - Owner Earnings DCF:    40%  (better for growth/capex-heavy)
+          - Earnings Power Value:  15%  (floor valuation, no-growth)
+          - Analyst Consensus:     15%  (market wisdom sanity check)
+
+        Weights are dynamically adjusted:
+          - If growth capex > 40% of total capex → OE DCF gets more weight
+          - If FCF is negative → FCF DCF weight drops to 0
+          - If analyst consensus unavailable → redistribute to other methods
+        """
+        methods = {}
+        weights = {}
+        fair_values = {}
+        notes = []
+
+        # --- Method 1: Standard FCF DCF ---
+        try:
+            fcf_dcf = self.dcf_valuation(ticker)
+            if not fcf_dcf.get("error"):
+                fv = fcf_dcf.get("intrinsic_per_share", 0)
+                if fv > 0:
+                    methods["fcf_dcf"] = fcf_dcf
+                    fair_values["fcf_dcf"] = fv
+                    weights["fcf_dcf"] = 0.30
+                else:
+                    notes.append("FCF DCF produced non-positive value; excluded")
+            else:
+                notes.append(f"FCF DCF failed: {fcf_dcf.get('error')}")
+        except Exception as e:
+            notes.append(f"FCF DCF error: {e}")
+
+        # --- Method 2: Owner Earnings DCF ---
+        try:
+            oe_dcf = self.owner_earnings_dcf(ticker)
+            if not oe_dcf.get("error"):
+                fv = oe_dcf.get("intrinsic_per_share", 0)
+                if fv > 0:
+                    methods["owner_earnings_dcf"] = oe_dcf
+                    fair_values["owner_earnings_dcf"] = fv
+                    weights["owner_earnings_dcf"] = 0.40
+                else:
+                    notes.append("Owner Earnings DCF produced non-positive value; excluded")
+            else:
+                notes.append(f"Owner Earnings DCF: {oe_dcf.get('error')}")
+        except Exception as e:
+            notes.append(f"Owner Earnings DCF error: {e}")
+
+        # --- Method 3: Earnings Power Value ---
+        try:
+            epv = self._earnings_power_value(ticker)
+            if not epv.get("error"):
+                fv = epv.get("per_share", 0)
+                if fv > 0:
+                    methods["epv"] = epv
+                    fair_values["epv"] = fv
+                    weights["epv"] = 0.15
+                else:
+                    notes.append("EPV produced non-positive value; excluded")
+            else:
+                notes.append(f"EPV: {epv.get('error')}")
+        except Exception as e:
+            notes.append(f"EPV error: {e}")
+
+        # --- Method 4: Analyst Consensus ---
+        try:
+            analyst = self._get_analyst_targets(ticker)
+            if analyst.get("available") and analyst.get("mean"):
+                methods["analyst_consensus"] = analyst
+                fair_values["analyst_consensus"] = float(analyst["mean"])
+                weights["analyst_consensus"] = 0.15
+            else:
+                notes.append("No analyst consensus available")
+        except Exception as e:
+            notes.append(f"Analyst targets error: {e}")
+
+        if not fair_values:
+            return {"error": "No valuation methods produced valid results", "notes": notes}
+
+        # --- Dynamic weight adjustment ---
+        # Adjust for capex-heavy companies
+        oe_data = methods.get("owner_earnings_dcf", {})
+        oe_breakdown = oe_data.get("owner_earnings_breakdown", {})
+        growth_capex_ratio = oe_breakdown.get("growth_capex_ratio", 0)
+
+        if growth_capex_ratio > 0.40 and "fcf_dcf" in weights and "owner_earnings_dcf" in weights:
+            # High growth capex — shift weight from FCF DCF to OE DCF
+            shift = 0.15
+            weights["fcf_dcf"] = max(0.10, weights["fcf_dcf"] - shift)
+            weights["owner_earnings_dcf"] += shift
+            notes.append(
+                f"Growth capex {growth_capex_ratio:.0%} of total — "
+                f"shifted weight toward Owner Earnings DCF"
+            )
+
+        # If OE DCF fair value is >2x FCF DCF, further reduce FCF DCF weight
+        # (indicates FCF heavily suppressed by growth investment)
+        fcf_fv = fair_values.get("fcf_dcf", 0)
+        oe_fv = fair_values.get("owner_earnings_dcf", 0)
+        if fcf_fv > 0 and oe_fv > 0 and oe_fv > fcf_fv * 2:
+            if "fcf_dcf" in weights:
+                extra_shift = min(0.10, weights["fcf_dcf"] - 0.05)
+                if extra_shift > 0:
+                    weights["fcf_dcf"] -= extra_shift
+                    weights["owner_earnings_dcf"] += extra_shift
+                    notes.append(
+                        f"OE DCF ${oe_fv:.0f} is >{fcf_fv * 2:.0f} (2× FCF DCF) — "
+                        f"FCF heavily suppressed by growth investment"
+                    )
+
+        # Reduce EPV weight for high-growth companies (EPV assumes no growth)
+        growth_info = methods.get("owner_earnings_dcf", {}).get("growth_rate") or \
+                     methods.get("fcf_dcf", {}).get("growth_rate") or 0
+        if growth_info > 0.15 and "epv" in weights:
+            # High-growth companies: EPV floor is less relevant
+            epv_reduction = 0.05
+            weights["epv"] = max(0.05, weights["epv"] - epv_reduction)
+            # Redistribute to OE DCF
+            if "owner_earnings_dcf" in weights:
+                weights["owner_earnings_dcf"] += epv_reduction
+            elif "fcf_dcf" in weights:
+                weights["fcf_dcf"] += epv_reduction
+            notes.append(f"Growth rate {growth_info:.0%} — reduced EPV weight (no-growth floor less relevant)")
+
+        # Normalize weights to sum to 1.0
+        total_weight = sum(weights.values())
+        if total_weight > 0:
+            weights = {k: v / total_weight for k, v in weights.items()}
+
+        # Compute weighted composite fair value
+        composite_fv = sum(fair_values[k] * weights[k] for k in fair_values)
+
+        # Get current price for MOS
+        current_price = 0
+        for m in methods.values():
+            if isinstance(m, dict) and m.get("current_price"):
+                current_price = m["current_price"]
+                break
+
+        margin_of_safety = (
+            (composite_fv - current_price) / composite_fv * 100
+            if composite_fv > 0
+            else -100
+        )
+
+        return {
+            "composite_fair_value": round(composite_fv, 2),
+            "current_price": current_price,
+            "margin_of_safety_pct": round(margin_of_safety, 2),
+            "verdict": (
+                "UNDERVALUED" if margin_of_safety > 15
+                else "FAIR" if margin_of_safety > -10
+                else "OVERVALUED"
+            ),
+            "method_fair_values": {k: round(v, 2) for k, v in fair_values.items()},
+            "method_weights": {k: round(v, 3) for k, v in weights.items()},
+            "methods": methods,
+            "notes": notes,
+        }
+
+    # ------------------------------------------------------------------
     # Smoothed FCF helper
     # ------------------------------------------------------------------
 
@@ -986,9 +1421,22 @@ class ValuationAnalyzerPlugin(_BaseAnalyzer):
         except Exception:
             dcf = {"error": "DCF failed"}
 
-        # Enhanced scoring: DCF 60% + Comps 25% + Quality 15%
-        dcf_mos = dcf.get("margin_of_safety_pct", 0)
-        dcf_score = max(0, min(100, 50 + dcf_mos))
+        # --- Multi-method composite fair value ---
+        composite = {}
+        try:
+            composite = self._analyzer.composite_fair_value(ticker)
+            dcf["composite"] = composite
+        except Exception as e:
+            dcf["composite"] = {"error": f"Composite valuation failed: {e}"}
+
+        # Use composite MOS for scoring if available, else fall back to DCF-only
+        if composite.get("margin_of_safety_pct") is not None:
+            mos_for_scoring = composite["margin_of_safety_pct"]
+        else:
+            mos_for_scoring = dcf.get("margin_of_safety_pct", 0)
+
+        mos_for_scoring = max(-50, min(50, mos_for_scoring))
+        dcf_score = max(0, min(100, 50 + mos_for_scoring))
 
         comps_score = 50
         try:

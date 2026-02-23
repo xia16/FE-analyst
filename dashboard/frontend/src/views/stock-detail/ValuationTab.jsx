@@ -28,32 +28,49 @@ export default function ValuationTab({ analysis }) {
   const probWeighted = dcf.probability_weighted_fair_value
   const riskReward = dcf.risk_reward_ratio
   const valueBreakdown = dcf.value_breakdown || {}
+  const composite = dcf.composite || {}
+  const methodFVs = composite.method_fair_values || {}
+  const methodWeights = composite.method_weights || {}
+
+  // Use composite fair value as primary if available, else fall back to DCF
+  const primaryFV = composite.composite_fair_value || dcf.intrinsic_per_share || dcf.fair_value_per_share
+  const primaryVerdict = composite.verdict || dcf.verdict
+  const primaryMOS = composite.margin_of_safety_pct ?? dcf.margin_of_safety_pct
+
+  const METHOD_LABELS = {
+    fcf_dcf: { label: 'FCF DCF', color: '#3b82f6' },
+    owner_earnings_dcf: { label: 'Owner Earnings', color: '#8b5cf6' },
+    epv: { label: 'Earnings Power', color: '#f59e0b' },
+    analyst_consensus: { label: 'Analyst Target', color: '#06b6d4' },
+  }
 
   return (
     <div className="space-y-6">
-      {/* DCF Summary Row */}
+      {/* Composite Fair Value Summary */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card className="text-center">
-          <div className="text-[#8b8d97] text-xs mb-1">DCF Fair Value</div>
-          <div className="text-2xl font-bold font-mono text-blue-400">
-            ${fmt(dcf.intrinsic_per_share ?? dcf.fair_value_per_share, 2)}
+          <div className="text-[#8b8d97] text-xs mb-1">
+            {composite.composite_fair_value ? 'Composite Fair Value' : 'DCF Fair Value'}
           </div>
-          {dcf.verdict && (
-            <Badge color={dcf.verdict === 'UNDERVALUED' ? '#22c55e' : dcf.verdict === 'OVERVALUED' ? '#ef4444' : '#eab308'}>
-              {dcf.verdict}
+          <div className="text-2xl font-bold font-mono text-blue-400">
+            ${fmt(primaryFV, 2)}
+          </div>
+          {primaryVerdict && (
+            <Badge color={primaryVerdict === 'UNDERVALUED' ? '#22c55e' : primaryVerdict === 'OVERVALUED' ? '#ef4444' : '#eab308'}>
+              {primaryVerdict}
             </Badge>
           )}
         </Card>
         <Card className="text-center">
           <div className="text-[#8b8d97] text-xs mb-1">Current Price</div>
           <div className="text-2xl font-bold font-mono">
-            ${fmt(dcf.current_price, 2)}
+            ${fmt(composite.current_price || dcf.current_price, 2)}
           </div>
         </Card>
         <Card className="text-center">
           <div className="text-[#8b8d97] text-xs mb-1">Margin of Safety</div>
-          <div className={`text-2xl font-bold font-mono ${(dcf.margin_of_safety_pct || 0) > 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {fmt(dcf.margin_of_safety_pct, 1)}%
+          <div className={`text-2xl font-bold font-mono ${(primaryMOS || 0) > 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {fmt(primaryMOS, 1)}%
           </div>
         </Card>
         <Card className="text-center">
@@ -69,6 +86,85 @@ export default function ValuationTab({ analysis }) {
           </div>
         </Card>
       </div>
+
+      {/* Multi-Method Fair Value Breakdown */}
+      {Object.keys(methodFVs).length > 1 && (
+        <Card>
+          <h3 className="text-sm font-semibold mb-3">Multi-Method Fair Value</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {Object.entries(methodFVs).map(([method, fv]) => {
+              const meta = METHOD_LABELS[method] || { label: method.replace(/_/g, ' '), color: '#8b8d97' }
+              const weight = methodWeights[method]
+              return (
+                <div key={method} className="p-3 rounded-lg border border-[#2a2d3e] bg-[#0f1117]">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-[10px] font-medium" style={{ color: meta.color }}>{meta.label}</div>
+                    {weight != null && (
+                      <div className="text-[9px] text-[#8b8d97]">{(weight * 100).toFixed(0)}% wt</div>
+                    )}
+                  </div>
+                  <div className="text-lg font-bold font-mono" style={{ color: meta.color }}>
+                    ${fmt(fv, 2)}
+                  </div>
+                  {(composite.current_price || dcf.current_price) && (
+                    <div className={`text-[10px] font-mono mt-1 ${fv > (composite.current_price || dcf.current_price) ? 'text-green-400' : 'text-red-400'}`}>
+                      {fv > (composite.current_price || dcf.current_price) ? '+' : ''}
+                      {fmt(((fv - (composite.current_price || dcf.current_price)) / (composite.current_price || dcf.current_price)) * 100, 1)}%
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          {/* Owner Earnings breakdown if available */}
+          {composite.methods?.owner_earnings_dcf?.owner_earnings_breakdown && (() => {
+            const oe = composite.methods.owner_earnings_dcf.owner_earnings_breakdown
+            return (
+              <div className="mt-3 border-t border-[#2a2d3e] pt-3">
+                <div className="text-[10px] text-[#8b8d97] mb-2">Owner Earnings Breakdown</div>
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-3 text-[10px]">
+                  <div>
+                    <div className="text-[#8b8d97]">Operating CF</div>
+                    <div className="font-bold font-mono text-green-400">{fmtCurrency(oe.operating_cash_flow)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[#8b8d97]">Total CapEx</div>
+                    <div className="font-bold font-mono text-red-400">-{fmtCurrency(oe.total_capex)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[#8b8d97]">Maintenance</div>
+                    <div className="font-bold font-mono text-yellow-400">-{fmtCurrency(oe.maintenance_capex)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[#8b8d97]">Growth CapEx</div>
+                    <div className="font-bold font-mono text-purple-400">{fmtCurrency(oe.growth_capex)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[#8b8d97]">Raw FCF</div>
+                    <div className="font-bold font-mono">{fmtCurrency(oe.raw_fcf)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[#8b8d97]">Owner Earnings</div>
+                    <div className="font-bold font-mono text-blue-400">{fmtCurrency(oe.owner_earnings)}</div>
+                  </div>
+                </div>
+                {oe.growth_capex_ratio > 0.3 && (
+                  <div className="mt-2 text-[9px] text-purple-400 bg-purple-500/5 rounded p-1.5">
+                    {(oe.growth_capex_ratio * 100).toFixed(0)}% of capex is growth investment — Owner Earnings DCF is more appropriate than FCF DCF
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+          {composite.notes && composite.notes.length > 0 && (
+            <div className="mt-2 space-y-0.5">
+              {composite.notes.map((n, i) => (
+                <div key={i} className="text-[9px] text-[#8b8d97]">{n}</div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Score Breakdown */}
       <Card>
