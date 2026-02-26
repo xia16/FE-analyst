@@ -106,11 +106,11 @@ export default function OverviewTab({ analysis, quote }) {
               </div>
             </div>
           )}
-          {piotroski.score != null && (
+          {piotroski.score != null && (piotroski.max_score || 9) > 0 && (
             <div>
               <div className="text-[#8b8d97]">Piotroski F-Score</div>
-              <div className="font-bold font-mono text-lg" style={{ color: getScoreColor(piotroski.score / 9 * 100) }}>
-                {piotroski.score}/9
+              <div className="font-bold font-mono text-lg" style={{ color: getScoreColor(piotroski.score / (piotroski.max_score || 9) * 100) }}>
+                {piotroski.score}/{piotroski.max_score || 9}
               </div>
               {piotroski.signal && (
                 <Badge color={piotroski.signal === 'STRONG' ? '#22c55e' : piotroski.signal === 'MODERATE' ? '#eab308' : '#ef4444'}>
@@ -119,7 +119,7 @@ export default function OverviewTab({ analysis, quote }) {
               )}
             </div>
           )}
-          {earningsQuality.assessment && earningsQuality.assessment !== 'N/A' && (
+          {earningsQuality.score != null && earningsQuality.max_score > 0 && (
             <div>
               <div className="text-[#8b8d97]">Earnings Quality</div>
               <div className="font-bold text-sm mt-1">
@@ -143,15 +143,18 @@ export default function OverviewTab({ analysis, quote }) {
         </div>
       </Card>
 
-      {/* Component scores */}
+      {/* Component scores — weights read from API response */}
       <Card>
         <h3 className="text-sm font-semibold mb-4">Component Scores</h3>
         <div className="space-y-3">
-          <ScoreBar label="Fundamental (30%)" score={scores.fundamental || 0} />
-          <ScoreBar label="Valuation (25%)" score={scores.valuation || 0} />
-          <ScoreBar label="Technical (20%)" score={scores.technical || 0} />
-          <ScoreBar label="Risk (15%)" score={scores.risk || 0} />
-          <ScoreBar label="Sentiment (10%)" score={scores.sentiment || 0} />
+          {Object.entries(scores)
+            .sort(([,a], [,b]) => b - a)
+            .map(([engine, score]) => {
+              const w = analysis.weights?.[engine]
+              const pct = w ? `${Math.round(w * 100)}%` : ''
+              const label = engine.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+              return <ScoreBar key={engine} label={`${label}${pct ? ` (${pct})` : ''}`} score={score ?? 0} />
+            })}
         </div>
       </Card>
 
