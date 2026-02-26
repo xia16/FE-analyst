@@ -970,7 +970,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
                             <Cell key={s.name} fill={s.name === 'Other' ? '#4b5563' : SECTOR_COLORS[i % SECTOR_COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip content={locked ? () => null : <PieTooltipContent />} wrapperStyle={{ outline: 'none', background: 'transparent', border: 'none', boxShadow: 'none' }} />
+                        <Tooltip content={locked ? () => null : (props) => <PieTooltipContent {...props} />} wrapperStyle={{ outline: 'none', background: 'transparent', border: 'none', boxShadow: 'none', padding: 0 }} contentStyle={{ background: 'transparent', border: 'none', padding: 0, boxShadow: 'none' }} />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-3 justify-center">
@@ -1012,7 +1012,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
                             <Cell key={c.name} fill={COUNTRY_COLORS[i % COUNTRY_COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip content={locked ? () => null : <PieTooltipContent />} wrapperStyle={{ outline: 'none', background: 'transparent', border: 'none', boxShadow: 'none' }} />
+                        <Tooltip content={locked ? () => null : (props) => <PieTooltipContent {...props} />} wrapperStyle={{ outline: 'none', background: 'transparent', border: 'none', boxShadow: 'none', padding: 0 }} contentStyle={{ background: 'transparent', border: 'none', padding: 0, boxShadow: 'none' }} />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 justify-center">

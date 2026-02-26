@@ -139,7 +139,7 @@ export default function StockDetailView({ ticker, setTicker }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                     <div>
                       <div className="text-[#8b8d97]">Market Cap</div>
                       <div className="font-semibold">{fmtCurrency(quoteData.marketCap)}</div>
