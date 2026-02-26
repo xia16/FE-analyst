@@ -1373,6 +1373,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
               <p className="text-xs">Use "Log Trade" to manually record buys and sells, or forward trade SMS via Telegram.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-[#8b8d97] border-b border-[#2a2d3e]">
@@ -1388,7 +1389,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
               <tbody>
                 {trades.map(t => (
                   <tr key={t.id} className="border-b border-[#2a2d3e]/50 hover:bg-[#252940] transition-colors">
-                    <td className="py-2 pr-2 text-[#8b8d97]">{new Date(t.timestamp).toLocaleDateString()}</td>
+                    <td className="py-2 pr-2 text-[#8b8d97] whitespace-nowrap">{new Date(t.timestamp).toLocaleDateString()}</td>
                     <td className="py-2 pr-2">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                         t.action === 'BUY' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
@@ -1398,13 +1399,14 @@ export default function MyPortfolioView({ onSelectTicker }) {
                     </td>
                     <td className="py-2 pr-2 font-mono font-semibold">{t.ticker}</td>
                     <td className="py-2 pr-2 text-[#8b8d97] max-w-[140px] truncate">{t.name}</td>
-                    <td className="py-2 pr-2 text-right font-mono">{locked ? maskNum(true) : t.quantity.toLocaleString()}</td>
-                    <td className="py-2 pr-2 text-right font-mono">{locked ? mask(true) : `$${fmt(t.price)}`}</td>
-                    <td className="py-2 text-right font-mono">{locked ? mask(true) : fmtCurrency(t.total_value)}</td>
+                    <td className="py-2 pr-2 text-right font-mono whitespace-nowrap">{locked ? maskNum(true) : t.quantity.toLocaleString()}</td>
+                    <td className="py-2 pr-2 text-right font-mono whitespace-nowrap">{locked ? mask(true) : `$${fmt(t.price)}`}</td>
+                    <td className="py-2 text-right font-mono whitespace-nowrap">{locked ? mask(true) : fmtCurrency(t.total_value)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </Card>
       )}
@@ -1448,15 +1450,16 @@ export default function MyPortfolioView({ onSelectTicker }) {
                 <p className="text-xs">Sell trades will automatically track your realized profit/loss here.</p>
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-[#a0a2ab] border-b border-[#2a2d3e] bg-[#0f1117]/40 text-[10px] uppercase tracking-wider">
-                    <th className="text-left py-2.5 pr-2 font-semibold">Date</th>
+                    <th className="text-left py-2.5 pr-2 font-semibold whitespace-nowrap">Date</th>
                     <th className="text-left py-2.5 pr-2 font-semibold">Ticker</th>
                     <th className="text-left py-2.5 pr-2 font-semibold">Name</th>
-                    <th className="text-right py-2.5 pr-2 font-semibold">Shares Sold</th>
-                    <th className="text-right py-2.5 pr-2 font-semibold">Avg Cost</th>
-                    <th className="text-right py-2.5 pr-2 font-semibold">Sell Price</th>
+                    <th className="text-right py-2.5 pr-2 font-semibold whitespace-nowrap">Shares Sold</th>
+                    <th className="text-right py-2.5 pr-2 font-semibold whitespace-nowrap">Avg Cost</th>
+                    <th className="text-right py-2.5 pr-2 font-semibold whitespace-nowrap">Sell Price</th>
                     <th className="text-right py-2.5 pr-2 font-semibold">P&L</th>
                     <th className="text-right py-2.5 font-semibold">Return</th>
                   </tr>
@@ -1464,22 +1467,23 @@ export default function MyPortfolioView({ onSelectTicker }) {
                 <tbody>
                   {realizedData.records.map(r => (
                     <tr key={r.id} className="border-b border-[#2a2d3e]/50 hover:bg-[#252940] transition-colors">
-                      <td className="py-2 pr-2 text-[#8b8d97]">{new Date(r.timestamp).toLocaleDateString()}</td>
+                      <td className="py-2 pr-2 text-[#8b8d97] whitespace-nowrap">{new Date(r.timestamp).toLocaleDateString()}</td>
                       <td className="py-2 pr-2 font-mono font-semibold">{r.ticker}</td>
                       <td className="py-2 pr-2 text-[#8b8d97] max-w-[120px] truncate">{r.name}</td>
-                      <td className="py-2 pr-2 text-right font-mono">{locked ? maskNum(true) : r.quantity.toLocaleString()}</td>
-                      <td className="py-2 pr-2 text-right font-mono">{locked ? mask(true) : `$${fmt(r.buy_avg_cost)}`}</td>
-                      <td className="py-2 pr-2 text-right font-mono">{locked ? mask(true) : `$${fmt(r.sell_price)}`}</td>
-                      <td className={`py-2 pr-2 text-right font-mono font-semibold ${(r.realized_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      <td className="py-2 pr-2 text-right font-mono whitespace-nowrap">{locked ? maskNum(true) : r.quantity.toLocaleString()}</td>
+                      <td className="py-2 pr-2 text-right font-mono whitespace-nowrap">{locked ? mask(true) : `$${fmt(r.buy_avg_cost)}`}</td>
+                      <td className="py-2 pr-2 text-right font-mono whitespace-nowrap">{locked ? mask(true) : `$${fmt(r.sell_price)}`}</td>
+                      <td className={`py-2 pr-2 text-right font-mono font-semibold whitespace-nowrap ${(r.realized_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {locked ? mask(true) : `${r.realized_pnl >= 0 ? '+' : ''}$${Math.abs(r.realized_pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                       </td>
-                      <td className={`py-2 text-right font-mono font-semibold ${(r.realized_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      <td className={`py-2 text-right font-mono font-semibold whitespace-nowrap ${(r.realized_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {r.realized_pct >= 0 ? '+' : ''}{r.realized_pct?.toFixed(2)}%
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </Card>
         </div>

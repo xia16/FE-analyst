@@ -81,7 +81,7 @@ export default function StockDetailView({ ticker, setTicker }) {
   return (
     <div className="space-y-6 animate-slide-in">
       {/* Search bar */}
-      <form onSubmit={handleSubmit} className="flex gap-2">
+      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2">
         <input
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}

@@ -128,7 +128,7 @@ export default function ValuationTab({ analysis, thesis }) {
             return (
               <div className="mt-3 border-t border-[#2a2d3e] pt-3">
                 <div className="text-[10px] text-[#8b8d97] mb-2">Owner Earnings Breakdown</div>
-                <div className="grid grid-cols-3 md:grid-cols-6 gap-3 text-[10px]">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-[10px]">
                   <div>
                     <div className="text-[#8b8d97]">Operating CF</div>
                     <div className="font-bold font-mono text-green-400">{fmtCurrency(oe.operating_cash_flow)}</div>
@@ -175,7 +175,7 @@ export default function ValuationTab({ analysis, thesis }) {
       {/* Score Breakdown */}
       <Card>
         <h3 className="text-sm font-semibold mb-3">Valuation Score Breakdown</h3>
-        <div className="grid grid-cols-3 gap-4 text-center">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
           <div>
             <div className="text-[#8b8d97] text-xs mb-1">DCF Score (60%)</div>
             <div className="text-xl font-bold font-mono" style={{ color: getScoreColor(val.dcf_score || 50) }}>
@@ -273,7 +273,7 @@ export default function ValuationTab({ analysis, thesis }) {
           </div>
           {/* Value breakdown summary */}
           {(valueBreakdown.pv_fcfs != null || valueBreakdown.pv_terminal != null) && (
-            <div className="mt-3 grid grid-cols-3 gap-4 text-xs">
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <div>
                 <div className="text-[#8b8d97] text-[10px]">PV of FCFs</div>
                 <div className="font-bold font-mono">{fmtCurrency(valueBreakdown.pv_fcfs)}</div>
@@ -548,7 +548,7 @@ export default function ValuationTab({ analysis, thesis }) {
           </div>
           {/* Probability-weighted summary */}
           {probWeighted != null && (
-            <div className="mt-3 flex items-center gap-4 bg-[#0f1117] rounded-lg p-3">
+            <div className="mt-3 flex flex-wrap items-center gap-3 sm:gap-4 bg-[#0f1117] rounded-lg p-3">
               <div className="text-xs text-[#8b8d97]">Probability-Weighted Fair Value:</div>
               <div className="text-lg font-bold font-mono text-purple-400">${fmt(probWeighted, 2)}</div>
               {(scenarioPrice || dcf.current_price) && (

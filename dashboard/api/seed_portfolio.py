@@ -95,19 +95,27 @@ def seed():
         except sqlite3.OperationalError:
             pass
 
-    # Clear existing holdings (fresh seed)
-    conn.execute("DELETE FROM holdings")
+    # Only insert seed holdings that don't already exist (preserve manual additions)
+    existing = {row[0] for row in conn.execute("SELECT ticker FROM holdings").fetchall()}
 
+    inserted = 0
+    skipped = 0
     for ticker, name, shares, avg_cost, sector, country, currency in HOLDINGS:
+        if ticker in existing:
+            skipped += 1
+            print(f"  SKIP   {ticker:8s} — already exists")
+            continue
         total_invested = shares * avg_cost
         conn.execute(
-            """INSERT OR REPLACE INTO holdings
+            """INSERT INTO holdings
                (ticker, name, exchange, quantity, avg_cost, total_invested, sector, country, portfolio_name, currency)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (ticker, name, "", shares, avg_cost, total_invested, sector, country, PORTFOLIO_NAME, currency),
         )
         sym = "€" if currency == "EUR" else "$"
         print(f"  Seeded {ticker:8s} — {shares:>5d} shares @ {sym}{avg_cost:.2f} = {sym}{total_invested:>10,.2f}  [{sector}]")
+        inserted += 1
+    print(f"\n  Inserted: {inserted}, Skipped (already exist): {skipped}")
 
     conn.commit()
 

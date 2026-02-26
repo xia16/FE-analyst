@@ -38,6 +38,9 @@ data/raw/*.parquet
 # Reports output
 reports/output/_archive/
 
+# Portfolio database (production data, don't overwrite on deploy)
+dashboard/api/portfolio.db
+
 # Node
 node_modules/
 

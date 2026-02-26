@@ -251,7 +251,7 @@ function UniverseView({ domainId, domainMeta, onSelectTicker }) {
                   <div className="mt-2 space-y-0.5">
                     {Object.entries(c.breakdown || {}).map(([k, v]) => (
                       <div key={k} className="flex items-center gap-1">
-                        <span className="text-[9px] text-[#8b8d97] w-24 truncate">{dimensions[k]?.label || k}</span>
+                        <span className="text-[9px] text-[#8b8d97] w-20 sm:w-24 truncate">{dimensions[k]?.label || k}</span>
                         <div className="flex-1 h-1.5 bg-[#1a1d27] rounded-full overflow-hidden">
                           <div
                             className="h-full rounded-full transition-all"
@@ -332,7 +332,7 @@ function HeatmapView({ domainId, domainMeta, onSelectTicker }) {
     <div className="space-y-6 animate-slide-in">
       <Card>
         <h3 className="text-sm font-semibold mb-4">Scoring Radar — Top 8 Companies</h3>
-        <ResponsiveContainer width="100%" height={400}>
+        <ResponsiveContainer width="100%" height={280}>
           <RadarChart data={radarData}>
             <PolarGrid stroke="#2a2d3e" />
             <PolarAngleAxis dataKey="dimension" tick={{ fill: '#8b8d97', fontSize: 10 }} />
@@ -379,7 +379,7 @@ function HeatmapView({ domainId, domainMeta, onSelectTicker }) {
               >
                 <td className="py-1.5 pr-2 text-[#8b8d97]">{i + 1}</td>
                 <td className="py-1.5 pr-2 font-mono font-semibold">{c.ticker}</td>
-                <td className="py-1.5 pr-2 text-[#8b8d97] max-w-[140px] truncate">{c.name}</td>
+                <td className="py-1.5 pr-2 text-[#8b8d97] max-w-[80px] md:max-w-[140px] truncate">{c.name}</td>
                 <td className="py-1.5 pr-2 text-center">
                   <span className="inline-block w-2 h-2 rounded-full" style={{ background: tiers[c.tier]?.color || DEFAULT_TIER_COLOR }} />
                 </td>

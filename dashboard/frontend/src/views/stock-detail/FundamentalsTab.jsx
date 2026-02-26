@@ -185,7 +185,7 @@ export default function FundamentalsTab({ analysis }) {
               {fmt(roic.value * 100, 1)}%
             </Badge>
           </div>
-          <div className="grid grid-cols-3 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div>
               <div className="text-[#8b8d97]">NOPAT</div>
               <div className="font-bold font-mono">{fmtCurrency(roic.nopat)}</div>
@@ -258,23 +258,23 @@ export default function FundamentalsTab({ analysis }) {
           {dupont3.roe != null && (
             <div className="mb-4">
               <div className="text-[10px] text-[#8b8d97] uppercase tracking-wider mb-2">3-Way: ROE = Margin x Turnover x Leverage</div>
-              <div className="flex items-center gap-2 text-xs font-mono">
-                <div className="p-2 rounded bg-[#0f1117] text-center flex-1">
+              <div className="flex flex-col sm:flex-row items-center gap-2 text-xs font-mono">
+                <div className="p-2 rounded bg-[#0f1117] text-center flex-1 w-full sm:w-auto">
                   <div className="text-[10px] text-[#8b8d97]">Profit Margin</div>
                   <div className="font-bold">{fmt(dupont3.profit_margin * 100, 1)}%</div>
                 </div>
-                <span className="text-[#8b8d97]">{'\u00D7'}</span>
-                <div className="p-2 rounded bg-[#0f1117] text-center flex-1">
+                <span className="text-[#8b8d97] hidden sm:block">{'\u00D7'}</span>
+                <div className="p-2 rounded bg-[#0f1117] text-center flex-1 w-full sm:w-auto">
                   <div className="text-[10px] text-[#8b8d97]">Asset Turnover</div>
                   <div className="font-bold">{fmt(dupont3.asset_turnover, 2)}x</div>
                 </div>
-                <span className="text-[#8b8d97]">{'\u00D7'}</span>
-                <div className="p-2 rounded bg-[#0f1117] text-center flex-1">
+                <span className="text-[#8b8d97] hidden sm:block">{'\u00D7'}</span>
+                <div className="p-2 rounded bg-[#0f1117] text-center flex-1 w-full sm:w-auto">
                   <div className="text-[10px] text-[#8b8d97]">Equity Multiplier</div>
                   <div className="font-bold">{fmt(dupont3.equity_multiplier, 2)}x</div>
                 </div>
-                <span className="text-[#8b8d97]">=</span>
-                <div className="p-2 rounded bg-blue-500/10 text-center flex-1 border border-blue-500/20">
+                <span className="text-[#8b8d97] hidden sm:block">=</span>
+                <div className="p-2 rounded bg-blue-500/10 text-center flex-1 w-full sm:w-auto border border-blue-500/20">
                   <div className="text-[10px] text-blue-400">ROE</div>
                   <div className="font-bold text-blue-400">{fmt(dupont3.roe * 100, 1)}%</div>
                 </div>
@@ -285,7 +285,7 @@ export default function FundamentalsTab({ analysis }) {
           {dupont5.roe != null && dupont5.tax_burden != null && (
             <div>
               <div className="text-[10px] text-[#8b8d97] uppercase tracking-wider mb-2">5-Way Decomposition</div>
-              <div className="grid grid-cols-5 gap-2 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-xs">
                 <div className="p-2 rounded bg-[#0f1117] text-center">
                   <div className="text-[10px] text-[#8b8d97]">Tax Burden</div>
                   <div className="font-bold font-mono">{fmt(dupont5.tax_burden * 100, 1)}%</div>
@@ -544,7 +544,7 @@ export default function FundamentalsTab({ analysis }) {
       {sgaEff.sga_revenue_ratio != null && (
         <Card>
           <h3 className="text-sm font-semibold mb-3">SG&A Efficiency</h3>
-          <div className="grid grid-cols-3 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div>
               <div className="text-[#8b8d97]">SG&A / Revenue</div>
               <div className="font-bold font-mono">{fmt(sgaEff.sga_revenue_ratio * 100, 1)}%</div>
