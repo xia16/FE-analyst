@@ -101,6 +101,10 @@ export default function MyPortfolioView({ onSelectTicker }) {
   const [adjustSaving, setAdjustSaving] = useState(false)
   const [adjustError, setAdjustError] = useState(null)
 
+  // Ticker validation state (shared — only one modal open at a time)
+  const [tickerValid, setTickerValid] = useState(null) // null=unchecked, true=valid, false=invalid
+  const [tickerValidating, setTickerValidating] = useState(false)
+
   // Log Trade modal state
   const [showLogTrade, setShowLogTrade] = useState(false)
   const [tradeForm, setTradeForm] = useState({ action: 'BUY', ticker: '', name: '', quantity: '', price: '', sector: '', country: '', currency: 'USD' })
@@ -147,6 +151,8 @@ export default function MyPortfolioView({ onSelectTicker }) {
       setAdjustForm({ ticker: '', name: '', quantity: '', avg_cost: '', sector: '', country: '' })
     }
     setAdjustError(null)
+    setTickerValid(null)
+    setTickerValidating(false)
     setShowAdjust(true)
   }
 
@@ -170,7 +176,10 @@ export default function MyPortfolioView({ onSelectTicker }) {
           country: adjustForm.country,
         }),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}))
+        throw new Error(errBody.detail || `HTTP ${res.status}`)
+      }
       setShowAdjust(false)
       refetch()
     } catch (err) {
@@ -190,20 +199,36 @@ export default function MyPortfolioView({ onSelectTicker }) {
     }
   }
 
-  const lookupTicker = async (ticker) => {
+  const lookupTicker = async (ticker, target = 'trade') => {
     if (!ticker || ticker.length < 1) return
+    setTickerValidating(true)
+    setTickerValid(null)
     try {
       const res = await fetch(`/api/ticker-info/${ticker.trim().toUpperCase()}`)
-      if (!res.ok) return
+      if (!res.ok) { setTickerValid(false); return }
       const info = await res.json()
-      setTradeForm(prev => ({
-        ...prev,
-        name: prev.name || info.name || '',
-        sector: prev.sector || info.sector || '',
-        country: prev.country || info.country || '',
-        currency: info.currency || prev.currency || 'USD',
-      }))
-    } catch { /* ignore lookup failures */ }
+      setTickerValid(info.valid !== false)
+      if (info.valid !== false) {
+        if (target === 'trade') {
+          setTradeForm(prev => ({
+            ...prev,
+            name: prev.name || info.name || '',
+            sector: prev.sector || info.sector || '',
+            country: prev.country || info.country || '',
+            currency: info.currency || prev.currency || 'USD',
+          }))
+        } else if (target === 'adjust') {
+          setAdjustForm(prev => ({
+            ...prev,
+            name: prev.name || info.name || '',
+          }))
+        }
+      }
+    } catch {
+      setTickerValid(null) // network error — don't block
+    } finally {
+      setTickerValidating(false)
+    }
   }
 
   const openLogTrade = (action = 'BUY', holding = null) => {
@@ -218,6 +243,8 @@ export default function MyPortfolioView({ onSelectTicker }) {
       currency: holding?.currency || 'USD',
     })
     setTradeError(null)
+    setTickerValid(null)
+    setTickerValidating(false)
     setShowLogTrade(true)
   }
 
@@ -446,11 +473,16 @@ export default function MyPortfolioView({ onSelectTicker }) {
                 <label className="text-[10px] text-[#8b8d97] block mb-1">Ticker *</label>
                 <input
                   value={adjustForm.ticker}
-                  onChange={e => setAdjustForm({ ...adjustForm, ticker: e.target.value })}
+                  onChange={e => { setAdjustForm({ ...adjustForm, ticker: e.target.value }); setTickerValid(null) }}
+                  onBlur={e => { if (e.target.value && !adjustForm.ticker) lookupTicker(e.target.value, 'adjust') }}
                   placeholder="e.g. AAPL"
                   disabled={!!adjustForm.ticker}
-                  className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#3b82f6] disabled:opacity-50"
+                  className={`w-full bg-[#0f1117] border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#3b82f6] disabled:opacity-50 ${
+                    !adjustForm.ticker ? (tickerValid === false ? 'border-red-500' : tickerValid === true ? 'border-green-500/50' : 'border-[#2a2d3e]') : 'border-[#2a2d3e]'
+                  }`}
                 />
+                {tickerValidating && !adjustForm.ticker && <span className="text-[9px] text-[#8b8d97] mt-0.5 block">Checking ticker...</span>}
+                {tickerValid === false && !adjustForm.ticker && <span className="text-[9px] text-red-400 mt-0.5 block">Ticker not found on Yahoo Finance</span>}
               </div>
               <div>
                 <label className="text-[10px] text-[#8b8d97] block mb-1">Name</label>
@@ -554,11 +586,15 @@ export default function MyPortfolioView({ onSelectTicker }) {
                   <label className="text-[10px] text-[#8b8d97] block mb-1">Ticker *</label>
                   <input
                     value={tradeForm.ticker}
-                    onChange={e => setTradeForm({ ...tradeForm, ticker: e.target.value })}
-                    onBlur={e => lookupTicker(e.target.value)}
+                    onChange={e => { setTradeForm({ ...tradeForm, ticker: e.target.value }); setTickerValid(null) }}
+                    onBlur={e => lookupTicker(e.target.value, 'trade')}
                     placeholder="e.g. AAPL"
-                    className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#3b82f6]"
+                    className={`w-full bg-[#0f1117] border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#3b82f6] ${
+                      tickerValid === false ? 'border-red-500' : tickerValid === true ? 'border-green-500/50' : 'border-[#2a2d3e]'
+                    }`}
                   />
+                  {tickerValidating && <span className="text-[9px] text-[#8b8d97] mt-0.5 block">Checking ticker...</span>}
+                  {tickerValid === false && <span className="text-[9px] text-red-400 mt-0.5 block">Ticker not found on Yahoo Finance</span>}
                 </div>
                 <div>
                   <label className="text-[10px] text-[#8b8d97] block mb-1">Name</label>

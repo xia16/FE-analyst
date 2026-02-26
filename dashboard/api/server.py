@@ -421,23 +421,15 @@ def get_quote(ticker: str) -> dict:
 
     price = safe_val(closes[-1])
 
-    # Check if market traded today by looking at the last timestamp
-    timestamps = chart.get("timestamp", [])
-    from datetime import date as _date
-    last_trade_date = None
-    if timestamps:
-        last_trade_date = datetime.utcfromtimestamp(timestamps[-1]).date()
-    today = _date.today()
-    market_open_today = last_trade_date == today if last_trade_date else False
-
-    if market_open_today and len(closes) >= 2:
-        # Market is open today: compare today's close to yesterday's close
+    # Always compare last two closes — this gives:
+    #   Market open:  today's live price vs yesterday's close → today's change
+    #   After hours / weekend / holiday: last close vs prior close → last trading day's change
+    if len(closes) >= 2:
         prev_close = safe_val(closes[-2])
         change = round(price - prev_close, 4) if price and prev_close else None
         change_pct = round((change / prev_close) * 100, 2) if change and prev_close else None
     else:
-        # Market closed (weekend/holiday): no change today
-        prev_close = price  # last close IS the current price
+        prev_close = price
         change = 0.0
         change_pct = 0.0
 
@@ -461,6 +453,41 @@ def get_quote(ticker: str) -> dict:
     }
     _quote_cache[ticker] = (datetime.utcnow(), result)
     return result
+
+
+def validate_ticker(ticker: str) -> dict:
+    """Validate whether a ticker symbol exists on Yahoo Finance.
+
+    Returns {"valid": True, "name": ..., "currency": ...}
+    or     {"valid": False, "reason": ...}
+    """
+    ticker = ticker.upper().strip()
+
+    if not ticker or not re.match(r"^[A-Z0-9.\-]{1,10}$", ticker):
+        return {"valid": False, "reason": "Invalid ticker format"}
+
+    # Check quote cache first
+    if ticker in _quote_cache:
+        cached_time, cached_data = _quote_cache[ticker]
+        if datetime.utcnow() - cached_time < QUOTE_CACHE_TTL:
+            if "error" not in cached_data and cached_data.get("price"):
+                return {
+                    "valid": True,
+                    "name": cached_data.get("name", ticker),
+                    "currency": cached_data.get("currency", "USD"),
+                }
+
+    # Hit Yahoo chart API (tries both query1 and query2)
+    chart = _fetch_yahoo_chart(ticker, range_="5d", interval="1d")
+    if chart is None:
+        return {"valid": False, "reason": "Ticker not found on Yahoo Finance"}
+
+    meta = chart.get("meta", {})
+    return {
+        "valid": True,
+        "name": meta.get("shortName") or meta.get("longName") or ticker,
+        "currency": meta.get("currency", "USD"),
+    }
 
 
 def _chart_to_dataframe(chart: dict) -> pd.DataFrame:
@@ -745,18 +772,28 @@ EXCHANGE_COUNTRY = {
 
 @app.get("/api/ticker-info/{ticker}")
 def get_ticker_info(ticker: str):
-    """Get name, currency, and country for a ticker using the fast chart API."""
-    quote = get_quote(ticker.upper())
-    chart = _fetch_yahoo_chart(ticker.upper(), range_="5d", interval="1d")
-    meta = chart.get("meta", {}) if chart else {}
+    """Get name, currency, country, and validity for a ticker."""
+    ticker_upper = ticker.upper()
+    chart = _fetch_yahoo_chart(ticker_upper, range_="5d", interval="1d")
+    if chart is None:
+        return {
+            "ticker": ticker_upper,
+            "name": ticker_upper,
+            "valid": False,
+            "sector": "",
+            "country": "",
+            "currency": "USD",
+        }
+    meta = chart.get("meta", {})
     exchange = meta.get("exchangeName", "")
     country = EXCHANGE_COUNTRY.get(exchange, "")
     return {
-        "ticker": ticker.upper(),
-        "name": quote.get("name") or meta.get("shortName") or ticker,
+        "ticker": ticker_upper,
+        "name": meta.get("shortName") or meta.get("longName") or ticker_upper,
+        "valid": True,
         "sector": "",
         "country": country,
-        "currency": meta.get("currency") or quote.get("currency") or "USD",
+        "currency": meta.get("currency") or "USD",
     }
 
 
@@ -1243,6 +1280,14 @@ class PositionUpdate(BaseModel):
 def adjust_position(pos: PositionUpdate):
     """Add or update a position manually."""
     import sqlite3 as _sql
+
+    ticker = pos.ticker.upper().strip()
+    validation = validate_ticker(ticker)
+    if validation["valid"] is False:
+        raise HTTPException(status_code=400, detail=f"Invalid ticker '{ticker}': {validation['reason']}")
+    if not pos.name and validation.get("name"):
+        pos.name = validation["name"]
+
     db_path = Path(__file__).parent / "portfolio.db"
     conn = _sql.connect(db_path)
 
@@ -1300,6 +1345,15 @@ def log_manual_trade(trade: ManualTrade):
 
     ticker = trade.ticker.upper()
     action = trade.action.upper()
+
+    # Validate ticker for BUY trades (SELL already checks holdings exist)
+    if action == "BUY":
+        validation = validate_ticker(ticker)
+        if validation["valid"] is False:
+            raise HTTPException(status_code=400, detail=f"Invalid ticker '{ticker}': {validation['reason']}")
+        if not trade.name and validation.get("name"):
+            trade.name = validation["name"]
+
     now = datetime.utcnow().isoformat()
     total_value = trade.quantity * trade.price
 
