@@ -10,6 +10,7 @@ import {
 
 import { Card, Badge, Spinner, fmt, fmtPct, fmtCurrency, RATING_COLORS, DEFAULT_TIER_COLOR } from './components/shared'
 import Nav from './components/Nav'
+import SearchOverlay from './components/SearchOverlay'
 import MyPortfolioView from './views/MyPortfolioView'
 import StockDetailView from './views/StockDetailView'
 import { ReportsView, GenerateReportView } from './views/ReportsView'
@@ -553,9 +554,22 @@ export default function App() {
   const [activeView, setActiveView] = useState('myportfolio')
   const [selectedTicker, setSelectedTicker] = useState(null)
   const [selectedReportPath, setSelectedReportPath] = useState(null)
+  const [searchOpen, setSearchOpen] = useState(false)
   const { data: alertData } = useAlerts()
 
   const { data: domainMeta } = useDomainMeta(activeDomain)
+
+  // Global keyboard shortcut: Cmd/Ctrl+K to open search
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen(prev => !prev)
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [])
 
   // Auto-select first domain when entering a research view (not on initial load)
   const handleSetActiveView = useCallback((view) => {
@@ -576,6 +590,11 @@ export default function App() {
     setActiveView('reports')
   }, [])
 
+  const handleSearch = useCallback((ticker) => {
+    setSelectedTicker(ticker)
+    setActiveView('detail')
+  }, [])
+
   const alertCount = alertData?.alerts?.length || 0
   const isDomainView = ['watchlist', 'universe', 'heatmap'].includes(activeView)
 
@@ -589,6 +608,12 @@ export default function App() {
         alertCount={alertCount}
         domains={domains}
         domainMeta={domainMeta}
+        onSearchOpen={() => setSearchOpen(true)}
+      />
+      <SearchOverlay
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onSearch={handleSearch}
       />
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
         {activeView === 'myportfolio' && (

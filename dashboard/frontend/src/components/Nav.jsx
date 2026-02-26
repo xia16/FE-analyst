@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 
-export default function Nav({ activeDomain, setActiveDomain, activeView, setActiveView, alertCount, domains, domainMeta }) {
+export default function Nav({ activeDomain, setActiveDomain, activeView, setActiveView, alertCount, domains, domainMeta, onSearchOpen }) {
   const [domainOpen, setDomainOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const menuRef = useRef(null)
@@ -108,6 +108,17 @@ export default function Nav({ activeDomain, setActiveDomain, activeView, setActi
 
           {/* Right: Global tools — desktop (hidden on mobile) */}
           <nav className="hidden sm:flex items-center gap-1">
+            {/* Search icon */}
+            <button
+              onClick={onSearchOpen}
+              className="p-2 rounded-lg text-[#8b8d97] hover:text-white hover:bg-[#1e2130] transition-colors mr-1"
+              title="Search stocks (⌘K)"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
+            <div className="w-px h-5 bg-[#2a2d3e]" />
             {globalTools.map(tool => (
               <button
                 key={tool.id}
@@ -128,8 +139,18 @@ export default function Nav({ activeDomain, setActiveDomain, activeView, setActi
             ))}
           </nav>
 
-          {/* Right: Hamburger — mobile only */}
-          <div className="sm:hidden relative" ref={menuRef}>
+          {/* Right: Search + Hamburger — mobile only */}
+          <div className="sm:hidden flex items-center gap-1">
+            <button
+              onClick={onSearchOpen}
+              className="p-2 rounded-lg text-[#8b8d97] hover:text-white hover:bg-[#1e2130] transition-colors"
+              title="Search stocks"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
+          <div className="relative" ref={menuRef}>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 rounded-lg text-[#8b8d97] hover:text-white hover:bg-[#1e2130] transition-colors relative"
@@ -167,6 +188,7 @@ export default function Nav({ activeDomain, setActiveDomain, activeView, setActi
                 ))}
               </div>
             )}
+          </div>
           </div>
         </div>
 

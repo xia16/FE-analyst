@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAnalysis, useThesis, useThesisStatus } from '../hooks'
+import { addToSearchHistory } from '../components/SearchOverlay'
 import { Card, Badge, Spinner, fmt, fmtPct, fmtCurrency, getScoreColor, RECOMMENDATION_COLORS } from '../components/shared'
 import OverviewTab from './stock-detail/OverviewTab'
 import TechnicalsTab from './stock-detail/TechnicalsTab'
@@ -44,7 +45,13 @@ export default function StockDetailView({ ticker, setTicker }) {
   useEffect(() => {
     if (!ticker) return
     setQuoteData(null)
-    fetch(`/api/quote/${ticker}`).then(r => r.json()).then(setQuoteData)
+    fetch(`/api/quote/${ticker}`).then(r => r.json()).then(data => {
+      setQuoteData(data)
+      // Save to search history
+      if (data && !data.error) {
+        addToSearchHistory(ticker, data.name || ticker)
+      }
+    })
   }, [ticker])
 
   useEffect(() => {
