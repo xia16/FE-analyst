@@ -54,6 +54,7 @@ COPY dashboard/api/server.py /app/dashboard/api/server.py
 COPY dashboard/api/telegram_bot.py /app/dashboard/api/telegram_bot.py
 COPY dashboard/api/seed_portfolio.py /app/dashboard/api/seed_portfolio.py
 COPY dashboard/api/run_analysis.py /app/dashboard/api/run_analysis.py
+COPY dashboard/api/db_persistence.py /app/dashboard/api/db_persistence.py
 
 # Seed portfolio DB at build time (bakes holdings into image)
 RUN python /app/dashboard/api/seed_portfolio.py

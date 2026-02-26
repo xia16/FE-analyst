@@ -34,6 +34,7 @@ from telegram_bot import (
     parse_trade_message, record_trade, get_holdings, get_trades,
     get_portfolio_summary, get_realized_pnl, get_realized_summary, init_db,
 )
+import db_persistence
 
 # Project root
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -678,6 +679,15 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(check_buy_opportunities, "cron", hour=9, minute=0)
 scheduler.start()
 
+
+# ---------------------------------------------------------------------------
+# Startup — restore portfolio DB from GCS (if available)
+# ---------------------------------------------------------------------------
+@app.on_event("startup")
+def _startup_restore_db():
+    db_persistence.restore()
+
+
 # ---------------------------------------------------------------------------
 # API Routes — Domain registry
 # ---------------------------------------------------------------------------
@@ -1308,6 +1318,7 @@ def adjust_position(pos: PositionUpdate):
     )
     conn.commit()
     conn.close()
+    db_persistence.backup()
     return {"status": "ok", "ticker": pos.ticker.upper(), "quantity": pos.quantity, "avg_cost": pos.avg_cost}
 
 
@@ -1320,6 +1331,7 @@ def remove_position(ticker: str):
     conn.execute("DELETE FROM holdings WHERE ticker = ?", (ticker.upper(),))
     conn.commit()
     conn.close()
+    db_persistence.backup()
     return {"status": "ok", "removed": ticker.upper()}
 
 
@@ -1405,6 +1417,7 @@ def log_manual_trade(trade: ManualTrade):
             )
         conn.commit()
         conn.close()
+        db_persistence.backup()
         return {"status": "ok", "action": "BUY", "ticker": ticker, "quantity": trade.quantity, "price": trade.price}
 
     elif action == "SELL":
@@ -1437,6 +1450,7 @@ def log_manual_trade(trade: ManualTrade):
                 )
         conn.commit()
         conn.close()
+        db_persistence.backup()
         return {"status": "ok", "action": "SELL", "ticker": ticker, "quantity": trade.quantity, "price": trade.price, "realized": realized}
 
     conn.close()

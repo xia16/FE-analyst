@@ -59,7 +59,7 @@ jobs:
             --memory 512Mi \
             --cpu 1 \
             --timeout 300 \
-            --set-env-vars "TWELVEDATA_API_KEY=${{ secrets.TWELVEDATA_API_KEY }}" \
+            --set-env-vars "TWELVEDATA_API_KEY=${{ secrets.TWELVEDATA_API_KEY }},GCS_DB_BUCKET=fe-analyst-data" \
             --port 8080
 
       - name: Show deployment URL
