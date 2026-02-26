@@ -20,7 +20,7 @@ export default function TechnicalsTab({ ticker }) {
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded text-[10px] font-medium transition-colors ${
                   period === p ? 'bg-[#3b82f6] text-white' : 'text-[#8b8d97] hover:text-white hover:bg-[#252940]'
                 }`}
               >

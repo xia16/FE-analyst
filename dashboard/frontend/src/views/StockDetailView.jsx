@@ -163,12 +163,12 @@ export default function StockDetailView({ ticker, setTicker }) {
           )}
 
           {/* Tab bar */}
-          <div className="flex gap-1 overflow-x-auto pb-1">
+          <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
             {TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'bg-[#3b82f6] text-white'
                     : 'bg-[#1e2130] text-[#8b8d97] hover:text-white hover:bg-[#252940]'

@@ -77,7 +77,7 @@ const maskNum = (locked) => locked ? '\u2022\u2022\u2022\u2022' : null
 
 export default function MyPortfolioView({ onSelectTicker }) {
   const { data, loading, error, refetch } = useHoldings()
-  const { data: tradeData } = useTradeHistory(20)
+  const { data: tradeData, refetch: refetchTrades } = useTradeHistory(20)
   const { data: allocData } = useAllocation()
   const { data: moversData } = useMovers()
   const [activeTab, setActiveTab] = useState('overview')
@@ -292,6 +292,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
       }
       setShowLogTrade(false)
       refetch()
+      refetchTrades()
       refetchRealized()
     } catch (err) {
       setTradeError(err.message)
@@ -379,18 +380,18 @@ export default function MyPortfolioView({ onSelectTicker }) {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[10px] text-[#8b8d97]">{summary.count || 0} positions</span>
           <button
             onClick={refetch}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#8b8d97] hover:text-white hover:bg-[#1e2130] transition-colors"
+            className="px-3 py-2 rounded-lg text-xs font-medium text-[#8b8d97] hover:text-white hover:bg-[#1e2130] transition-colors"
           >
             Refresh
           </button>
           {/* Log Trade button */}
           <button
             onClick={() => openLogTrade('BUY')}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-white hover:brightness-110 transition-all flex items-center gap-1.5 bg-gradient-to-r from-[#3b82f6] to-[#6366f1]"
+            className="px-3 py-2 rounded-lg text-xs font-medium text-white hover:brightness-110 transition-all flex items-center gap-1.5 bg-gradient-to-r from-[#3b82f6] to-[#6366f1]"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -408,7 +409,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
                 handleLock()
               }
             }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+            className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
               locked
                 ? 'bg-[#1e2130] text-[#8b8d97] hover:text-white border border-[#2a2d3e]'
                 : 'bg-green-500/15 text-green-400 border border-green-500/30'
@@ -429,8 +430,8 @@ export default function MyPortfolioView({ onSelectTicker }) {
 
       {/* Password prompt modal */}
       {showPwPrompt && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto pt-16 pb-8" onClick={() => setShowPwPrompt(false)}>
-          <div className="bg-[#1e2130] border border-[#2a2d3e] rounded-xl p-6 w-80 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto pt-8 sm:pt-16 pb-8 px-4" onClick={() => setShowPwPrompt(false)}>
+          <div className="bg-[#1e2130] border border-[#2a2d3e] rounded-xl p-6 w-full max-w-xs shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-semibold mb-3">Unlock Portfolio</h3>
             <p className="text-xs text-[#8b8d97] mb-4">Enter password to reveal portfolio values.</p>
             <input
@@ -465,8 +466,8 @@ export default function MyPortfolioView({ onSelectTicker }) {
 
       {/* Adjust position modal (for editing existing positions) */}
       {showAdjust && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto pt-16 pb-8" onClick={() => setShowAdjust(false)}>
-          <div className="bg-[#1e2130] border border-[#2a2d3e] rounded-xl p-6 w-96 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto pt-8 sm:pt-16 pb-8 px-4" onClick={() => setShowAdjust(false)}>
+          <div className="bg-[#1e2130] border border-[#2a2d3e] rounded-xl p-5 sm:p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-semibold mb-4">Edit {adjustForm.ticker || 'Position'}</h3>
             <div className="space-y-3">
               <div>
@@ -559,8 +560,8 @@ export default function MyPortfolioView({ onSelectTicker }) {
 
       {/* Log Trade modal */}
       {showLogTrade && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto pt-16 pb-8" onClick={() => setShowLogTrade(false)}>
-          <div className="bg-[#1e2130] border border-[#2a2d3e] rounded-xl p-6 w-96 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto pt-8 sm:pt-16 pb-8 px-4" onClick={() => setShowLogTrade(false)}>
+          <div className="bg-[#1e2130] border border-[#2a2d3e] rounded-xl p-5 sm:p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-semibold mb-4">Log Trade</h3>
             {/* BUY / SELL toggle */}
             <div className="flex rounded-lg overflow-hidden border border-[#2a2d3e] mb-4">
@@ -636,7 +637,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="text-[10px] text-[#8b8d97] block mb-1">Sector</label>
                   <input
@@ -655,7 +656,7 @@ export default function MyPortfolioView({ onSelectTicker }) {
                     className="w-full bg-[#0f1117] border border-[#2a2d3e] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#3b82f6]"
                   />
                 </div>
-                <div>
+                <div className="col-span-2 sm:col-span-1">
                   <label className="text-[10px] text-[#8b8d97] block mb-1">Currency</label>
                   <select
                     value={tradeForm.currency}
@@ -741,12 +742,12 @@ export default function MyPortfolioView({ onSelectTicker }) {
       </div>
 
       {/* Sub-tabs */}
-      <div className="flex items-center gap-1 border-b border-[#2a2d3e] pb-1">
+      <div className="flex items-center gap-1 border-b border-[#2a2d3e] pb-1 overflow-x-auto scrollbar-hide">
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 text-xs font-medium rounded-t-lg transition-colors ${
+            className={`px-4 py-2.5 text-xs font-medium rounded-t-lg transition-colors whitespace-nowrap ${
               activeTab === tab.id
                 ? 'bg-[#3b82f6]/10 text-white border-b-2 border-[#3b82f6]'
                 : 'text-[#8b8d97] hover:text-white hover:bg-[#1e2130]'
@@ -760,8 +761,8 @@ export default function MyPortfolioView({ onSelectTicker }) {
       {/* ═══ OVERVIEW TAB ═══ */}
       {activeTab === 'overview' && (
         <div className="space-y-6 animate-slide-in">
-          {/* Holdings Table */}
-          <Card className="overflow-x-auto">
+          {/* Holdings */}
+          <Card className="overflow-hidden">
             <h3 className="text-sm font-semibold mb-4">Holdings — Live</h3>
             {holdings.length === 0 ? (
               <div className="text-center py-12 text-[#8b8d97]">
@@ -769,6 +770,68 @@ export default function MyPortfolioView({ onSelectTicker }) {
                 <p className="text-xs">Trade SMS messages forwarded via Telegram will automatically update your portfolio here.</p>
               </div>
             ) : (
+              <>
+                {/* ── Mobile card layout (< md) ── */}
+                <div className="md:hidden space-y-2">
+                  {sorted.map(h => {
+                    const weight = totalMV > 0 && h.market_value ? (h.market_value / totalMV * 100) : 0
+                    return (
+                      <div
+                        key={h.ticker}
+                        className="bg-[#0f1117]/60 border border-[#2a2d3e]/50 rounded-lg p-3 cursor-pointer active:bg-[#252940] transition-colors"
+                        onClick={() => onSelectTicker(h.ticker)}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-mono font-semibold text-sm">{h.ticker}</span>
+                            <span className="text-[#8b8d97] text-xs truncate">{h.quote_name || h.name}</span>
+                          </div>
+                          <span className={`text-xs font-mono font-semibold flex-shrink-0 ${(h.change_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {fmtPct(h.change_pct)}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div>
+                            <div className="text-[#8b8d97] text-[10px]">Price</div>
+                            <div className="font-mono">{h.current_price_usd ? `$${fmt(h.current_price_usd)}` : h.current_price ? `$${fmt(h.current_price)}` : '\u2014'}</div>
+                          </div>
+                          <div>
+                            <div className="text-[#8b8d97] text-[10px]">Mkt Value</div>
+                            <div className="font-mono">{locked ? mask(true) : (h.market_value ? fmtCurrency(h.market_value) : '\u2014')}</div>
+                          </div>
+                          <div>
+                            <div className="text-[#8b8d97] text-[10px]">P&L</div>
+                            <div className={`font-mono ${(h.unrealized_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {locked ? mask(true) : (h.unrealized_pnl != null ? `${h.unrealized_pnl >= 0 ? '+' : '-'}$${Math.abs(h.unrealized_pnl).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '\u2014')}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#2a2d3e]/30">
+                          <div className="flex items-center gap-2 text-[10px] text-[#8b8d97]">
+                            <span>{locked ? maskNum(true) : h.quantity.toLocaleString()} shares</span>
+                            <span className="text-[#2a2d3e]">&middot;</span>
+                            <span className={`font-semibold ${(h.unrealized_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmtPct(h.unrealized_pct)}</span>
+                            <span className="text-[#2a2d3e]">&middot;</span>
+                            <span>{weight.toFixed(1)}%</span>
+                          </div>
+                          <div className="flex items-center gap-0.5">
+                            <button onClick={(e) => { e.stopPropagation(); openLogTrade('SELL', h) }} className="p-1.5 rounded hover:bg-[#1e2130] text-[#8b8d97] hover:text-red-400" title="Sell">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); openAdjust(h) }} className="p-1.5 rounded hover:bg-[#1e2130] text-[#8b8d97] hover:text-[#3b82f6]" title="Edit">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); handleRemovePosition(h.ticker) }} className="p-1.5 rounded hover:bg-[#1e2130] text-[#8b8d97] hover:text-red-400" title="Remove">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {/* ── Desktop table (>= md) ── */}
+                <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-[#a0a2ab] border-b border-[#2a2d3e] bg-[#0f1117]/40 text-[10px] uppercase tracking-wider">
@@ -870,6 +933,8 @@ export default function MyPortfolioView({ onSelectTicker }) {
                   })}
                 </tbody>
               </table>
+              </div>
+              </>
             )}
           </Card>
 

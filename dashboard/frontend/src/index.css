@@ -203,3 +203,19 @@ body {
   max-width: 100%;
   border-radius: 8px;
 }
+
+/* Wrap markdown tables for mobile overflow */
+.markdown-report table {
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hidden-scrollbar utility for horizontal tab strips */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
