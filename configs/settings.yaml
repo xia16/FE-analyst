@@ -42,7 +42,7 @@ analysis:
     technical:
       module: src.analysis.technical
       class: TechnicalAnalyzerPlugin
-      weight: 0.20
+      weight: 0.18
       enabled: true
     fundamental:
       module: src.analysis.fundamental
@@ -57,17 +57,27 @@ analysis:
     risk:
       module: src.analysis.risk
       class: RiskAnalyzerPlugin
-      weight: 0.15
+      weight: 0.13
       enabled: true
     sentiment:
       module: src.analysis.sentiment
       class: SentimentAnalyzerPlugin
-      weight: 0.10
+      weight: 0.07
       enabled: true  # gathers raw data; Claude interprets during analysis
     moat:
       module: src.analysis.moat
       class: MoatAnalyzerPlugin
-      weight: 0.10
+      weight: 0.02
+      enabled: true
+    international:
+      module: src.analysis.international
+      class: InternationalAnalyzerPlugin
+      weight: 0.08
+      enabled: true
+    portfolio_risk:
+      module: src.analysis.portfolio_risk
+      class: PortfolioRiskAnalyzerPlugin
+      weight: 0.07
       enabled: true
 
   # Per-analyzer settings

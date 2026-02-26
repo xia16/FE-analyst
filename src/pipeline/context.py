@@ -29,6 +29,9 @@ class PipelineContext:
     # Analysis results: ticker -> {analyzer_name -> result_dict}
     analysis_results: dict[str, dict[str, Any]] = field(default_factory=dict)
 
+    # Portfolio holdings (optional, for portfolio-level analyzers)
+    holdings: list[dict] = field(default_factory=list)  # [{"ticker": str, "weight": float}]
+
     # Scores: ticker -> {composite_score, component_scores, recommendation}
     scores: dict[str, dict] = field(default_factory=dict)
 

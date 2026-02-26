@@ -12,6 +12,42 @@ from src.utils.logger import setup_logger
 
 logger = setup_logger("risk")
 
+
+# ------------------------------------------------------------------
+# Risk-free rate with live refresh
+# ------------------------------------------------------------------
+_RF_RATE: float = 0.04          # annual, decimal
+_RF_RATE_UPDATED: str = "2026-02-01"
+_RF_RATE_SOURCE: str = "static"
+
+
+def _refresh_risk_free_rate() -> None:
+    """Attempt to fetch the 13-week T-bill yield (^IRX) from yfinance."""
+    global _RF_RATE, _RF_RATE_UPDATED, _RF_RATE_SOURCE
+    from datetime import datetime
+    last = datetime.strptime(_RF_RATE_UPDATED, "%Y-%m-%d")
+    if (datetime.now() - last).days < 7:
+        return  # Refreshed recently
+    try:
+        import yfinance as yf
+        tk = yf.Ticker("^IRX")
+        hist = tk.history(period="5d")
+        if not hist.empty:
+            rate_pct = float(hist["Close"].iloc[-1])
+            if 0 < rate_pct < 20:
+                _RF_RATE = rate_pct / 100
+                _RF_RATE_UPDATED = datetime.now().strftime("%Y-%m-%d")
+                _RF_RATE_SOURCE = "^IRX (13-week T-bill)"
+                logger.info("Risk-free rate refreshed: %.4f from ^IRX", _RF_RATE)
+    except Exception:
+        pass  # Keep static fallback
+
+
+def get_risk_free_rate() -> tuple[float, str, str]:
+    """Return (annual_rate, as_of_date, source)."""
+    _refresh_risk_free_rate()
+    return _RF_RATE, _RF_RATE_UPDATED, _RF_RATE_SOURCE
+
 # Dynamic benchmark mapping by country / exchange
 COUNTRY_BENCHMARKS = {
     "Japan": "EWJ",          # iShares MSCI Japan
@@ -106,14 +142,19 @@ class RiskAnalyzer:
         aligned = pd.concat([returns, bench_returns], axis=1, join="inner")
         aligned.columns = ["stock", "benchmark"]
 
+        rf_rate, rf_date, rf_source = get_risk_free_rate()
+
         result = {
             "ticker": ticker,
             "benchmark": benchmark,
             "benchmark_reason": bench_reason,
             "period": period,
+            "risk_free_rate": rf_rate,
+            "risk_free_rate_as_of": rf_date,
+            "risk_free_rate_source": rf_source,
             "volatility": self._annualized_volatility(returns),
-            "sharpe_ratio": self._sharpe_ratio(returns),
-            "sortino_ratio": self._sortino_ratio(returns),
+            "sharpe_ratio": self._sharpe_ratio(returns, rf_rate),
+            "sortino_ratio": self._sortino_ratio(returns, rf_rate),
             "max_drawdown": self._max_drawdown(df["Close"]),
             "beta": self._beta(aligned["stock"], aligned["benchmark"]),
             "var_95": self._value_at_risk(returns, confidence=0.95),
@@ -196,7 +237,9 @@ class RiskAnalyzer:
         return round(float(returns.std() * np.sqrt(252)), 4)
 
     @staticmethod
-    def _sharpe_ratio(returns: pd.Series, risk_free_annual: float = 0.04) -> float:
+    def _sharpe_ratio(returns: pd.Series, risk_free_annual: float | None = None) -> float:
+        if risk_free_annual is None:
+            risk_free_annual = get_risk_free_rate()[0]
         rf_daily = risk_free_annual / 252
         excess = returns - rf_daily
         if excess.std() == 0:
@@ -204,7 +247,9 @@ class RiskAnalyzer:
         return round(float(excess.mean() / excess.std() * np.sqrt(252)), 4)
 
     @staticmethod
-    def _sortino_ratio(returns: pd.Series, risk_free_annual: float = 0.04) -> float:
+    def _sortino_ratio(returns: pd.Series, risk_free_annual: float | None = None) -> float:
+        if risk_free_annual is None:
+            risk_free_annual = get_risk_free_rate()[0]
         rf_daily = risk_free_annual / 252
         excess = returns - rf_daily
         downside = excess[excess < 0]
@@ -236,6 +281,62 @@ class RiskAnalyzer:
         return round(float(returns[returns <= var].mean()), 4)
 
 
+# ------------------------------------------------------------------
+# Shared composite risk scoring
+# ------------------------------------------------------------------
+
+_RISK_WEIGHTS = {
+    "max_drawdown": 0.25,
+    "sortino": 0.25,
+    "cvar": 0.20,
+    "beta_adj_vol": 0.15,
+    "liquidity": 0.15,
+}
+
+
+def compute_risk_score(result: dict) -> tuple[float, dict]:
+    """Composite risk score from all computed metrics.
+
+    Returns (score 0-100, sub_scores dict).  Higher = less risky = better.
+    """
+    sub_scores: dict[str, float] = {}
+
+    # 1. Max drawdown (25%) — 0% DD → 100, -50%+ DD → 0
+    mdd = abs(result.get("max_drawdown", 0.3))
+    sub_scores["max_drawdown"] = max(0, min(100, (1 - mdd / 0.5) * 100))
+
+    # 2. Sortino ratio (25%) — Sortino >= 2.0 → 100, <= -0.5 → 0
+    sortino = result.get("sortino_ratio", 0.0)
+    sub_scores["sortino"] = max(0, min(100, (sortino + 0.5) / 2.5 * 100))
+
+    # 3. CVaR 95 (20%) — 0% CVaR → 100, -5% daily → 0
+    cvar = abs(result.get("cvar_95", 0.03))
+    sub_scores["cvar"] = max(0, min(100, (1 - cvar / 0.05) * 100))
+
+    # 4. Beta-adjusted volatility (15%) — vol * max(beta, 0.5), vs 0.6 ceiling
+    vol = result.get("volatility", 0.3)
+    beta = abs(result.get("beta", 1.0))
+    beta_adj_vol = vol * max(beta, 0.5)
+    sub_scores["beta_adj_vol"] = max(0, min(100, (1 - beta_adj_vol / 0.6) * 100))
+
+    # 5. Liquidity (15%) — log-linear interpolation on dollar volume
+    #    Eliminates 30-point cliffs at tier boundaries.
+    #    Anchors: $100K (log10=5) → 5, $100M (log10=8) → 100
+    import math
+    liq = result.get("liquidity", {})
+    dollar_vol = liq.get("avg_dollar_volume_20d", 0)
+    if dollar_vol <= 0:
+        sub_scores["liquidity"] = 0
+    elif dollar_vol >= 100_000_000:
+        sub_scores["liquidity"] = 100
+    else:
+        log_dv = math.log10(max(dollar_vol, 1))
+        sub_scores["liquidity"] = max(0, min(100, (log_dv - 5.0) * 31.67 + 5.0))
+
+    score = sum(sub_scores[k] * _RISK_WEIGHTS[k] for k in _RISK_WEIGHTS)
+    return round(score, 1), sub_scores
+
+
 # --- Plugin adapter for pipeline ---
 from src.analysis.base import BaseAnalyzer as _BaseAnalyzer
 
@@ -249,21 +350,11 @@ class RiskAnalyzerPlugin(_BaseAnalyzer):
 
     def analyze(self, ticker, ctx):
         result = self._analyzer.analyze(ticker)
-        vol = result.get("volatility", 0.3)
-        score = max(0, min(100, (1 - vol) * 100))
+        if "error" in result:
+            result["score"] = 50.0
+            return result
 
-        # Penalize tail risk
-        if result.get("tail_risk", "").startswith("HIGH"):
-            score = max(0, score - 10)
-        elif result.get("tail_risk", "").startswith("ELEVATED"):
-            score = max(0, score - 5)
-
-        # Penalize illiquidity
-        liquidity = result.get("liquidity", {}).get("signal", "")
-        if liquidity == "ILLIQUID":
-            score = max(0, score - 15)
-        elif liquidity == "LOW LIQUIDITY":
-            score = max(0, score - 5)
-
-        result["score"] = round(score, 1)
+        score, sub_scores = compute_risk_score(result)
+        result["score"] = score
+        result["risk_sub_scores"] = sub_scores
         return result

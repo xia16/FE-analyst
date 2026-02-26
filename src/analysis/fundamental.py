@@ -15,6 +15,28 @@ from src.utils.logger import setup_logger
 
 logger = setup_logger("fundamental_analysis")
 
+# ---------------------------------------------------------------------------
+# Country-specific constants
+# ---------------------------------------------------------------------------
+
+COUNTRY_TAX_RATES = {
+    "Japan": 0.3062,
+    "United States": 0.21,
+    "Taiwan": 0.20,
+    "South Korea": 0.242,
+    "Netherlands": 0.257,
+    "Germany": 0.2983,
+    "France": 0.2541,
+    "China": 0.25,
+    "United Kingdom": 0.25,
+    "Israel": 0.23,
+}
+
+COUNTRY_ROE_THRESHOLDS = {
+    # (strong_threshold, adequate_threshold)
+    "Japan": (0.12, 0.06),
+    "default": (0.15, 0.08),
+}
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -88,14 +110,15 @@ class FundamentalAnalyzer:
 
         # yfinance info for supplemental data (shares outstanding, market cap)
         info = self._fetch_info(ticker)
+        country = info.get("country") or "United States"
 
         # --- Legacy scores (preserved interface) ---
-        health = self._assess_financial_health(ratios)
+        health = self._assess_financial_health(ratios, country=country)
         growth = self._assess_growth(ratios)
         valuation = self._assess_valuation(ratios)
 
         # --- New institutional metrics ---
-        roic = self._calc_roic(income_a, balance)
+        roic = self._calc_roic(income_a, balance, country=country)
         piotroski = self._calc_piotroski(income_a, balance, cashflow, ratios, info)
         dupont = self._calc_dupont(income_a, balance)
         earnings_quality = self._calc_earnings_quality(income_a, cashflow, balance)
@@ -169,7 +192,7 @@ class FundamentalAnalyzer:
     # ------------------------------------------------------------------
     # Legacy scorers (preserved from original)
     # ------------------------------------------------------------------
-    def _assess_financial_health(self, ratios: dict) -> dict:
+    def _assess_financial_health(self, ratios: dict, country: str = "United States") -> dict:
         """Score financial health based on key ratios (0-6)."""
         score = 0
         reasons: list[str] = []
@@ -198,10 +221,13 @@ class FundamentalAnalyzer:
 
         roe = ratios.get("roe")
         if roe is not None:
-            if roe > 0.15:
+            strong_roe, adequate_roe = COUNTRY_ROE_THRESHOLDS.get(
+                country, COUNTRY_ROE_THRESHOLDS["default"]
+            )
+            if roe > strong_roe:
                 score += 2
                 reasons.append(f"Strong ROE: {roe:.1%}")
-            elif roe > 0.08:
+            elif roe > adequate_roe:
                 score += 1
                 reasons.append(f"Adequate ROE: {roe:.1%}")
             else:
@@ -270,10 +296,11 @@ class FundamentalAnalyzer:
     # ------------------------------------------------------------------
     # 1. ROIC
     # ------------------------------------------------------------------
-    def _calc_roic(self, income: pd.DataFrame, balance: pd.DataFrame) -> dict:
+    def _calc_roic(self, income: pd.DataFrame, balance: pd.DataFrame,
+                   country: str = "United States") -> dict:
         """Return on Invested Capital = NOPAT / Invested Capital."""
         result = {"value": None, "nopat": None, "invested_capital": None,
-                  "score": 0, "max_score": 3}
+                  "score": None, "max_score": 3}
         try:
             if income.empty or balance.empty:
                 return result
@@ -282,11 +309,11 @@ class FundamentalAnalyzer:
             pretax = _safe_get(income, "Pretax Income")
             tax_prov = _safe_get(income, "Tax Provision")
 
-            # Effective tax rate; fall back to statutory 25%
+            # Effective tax rate; fall back to country-specific statutory rate
             if pretax and tax_prov and pretax > 0:
                 tax_rate = tax_prov / pretax
             else:
-                tax_rate = 0.25
+                tax_rate = COUNTRY_TAX_RATES.get(country, 0.25)
 
             if op_income is None:
                 return result
@@ -331,9 +358,9 @@ class FundamentalAnalyzer:
     def _calc_piotroski(self, income: pd.DataFrame, balance: pd.DataFrame,
                         cashflow: pd.DataFrame, ratios: dict, info: dict) -> dict:
         """Piotroski F-Score: 9 binary tests of financial strength."""
-        breakdown = {f"F{i}": False for i in range(1, 10)}
-        result = {"score": 0, "max_score": 9, "breakdown": breakdown,
-                  "signal": "WEAK"}
+        breakdown = {f"F{i}": None for i in range(1, 10)}
+        result = {"score": None, "max_score": 0, "breakdown": breakdown,
+                  "signal": "N/A"}
         try:
             has_two_years = (not income.empty and income.shape[1] >= 2
                             and not balance.empty and balance.shape[1] >= 2)
@@ -341,8 +368,8 @@ class FundamentalAnalyzer:
             # --- Profitability ---
             # F1: Net Income > 0
             ni_curr = _safe_get(income, "Net Income", col=0)
-            if ni_curr is not None and ni_curr > 0:
-                breakdown["F1"] = True
+            if ni_curr is not None:
+                breakdown["F1"] = ni_curr > 0
 
             # F2: ROA improving (or positive if only 1 year)
             total_assets_curr = _safe_get(balance, "Total Assets", col=0)
@@ -351,20 +378,20 @@ class FundamentalAnalyzer:
                 ni_prev = _safe_get(income, "Net Income", col=1)
                 total_assets_prev = _safe_get(balance, "Total Assets", col=1)
                 roa_prev = _safe_div(ni_prev, total_assets_prev)
-                if roa_curr is not None and roa_prev is not None and roa_curr > roa_prev:
-                    breakdown["F2"] = True
+                if roa_curr is not None and roa_prev is not None:
+                    breakdown["F2"] = roa_curr > roa_prev
             else:
-                if roa_curr is not None and roa_curr > 0:
-                    breakdown["F2"] = True
+                if roa_curr is not None:
+                    breakdown["F2"] = roa_curr > 0
 
             # F3: Operating Cash Flow > 0
             ocf_curr = _safe_get(cashflow, "Operating Cash Flow", col=0)
-            if ocf_curr is not None and ocf_curr > 0:
-                breakdown["F3"] = True
+            if ocf_curr is not None:
+                breakdown["F3"] = ocf_curr > 0
 
             # F4: OCF > Net Income (accruals check)
-            if ocf_curr is not None and ni_curr is not None and ocf_curr > ni_curr:
-                breakdown["F4"] = True
+            if ocf_curr is not None and ni_curr is not None:
+                breakdown["F4"] = ocf_curr > ni_curr
 
             # --- Leverage / Liquidity ---
             # F5: Long-term debt ratio decreased (or stayed zero)
@@ -372,11 +399,12 @@ class FundamentalAnalyzer:
             if ltd_curr is not None:
                 if has_two_years:
                     ltd_prev = _safe_get(balance, "Long Term Debt", col=1) or 0
-                    if ltd_curr <= ltd_prev:
-                        breakdown["F5"] = True
+                    breakdown["F5"] = ltd_curr <= ltd_prev
                 else:
-                    if ltd_curr == 0:
-                        breakdown["F5"] = True
+                    breakdown["F5"] = ltd_curr == 0
+            elif not balance.empty:
+                # No debt line item on balance sheet = likely zero debt = pass
+                breakdown["F5"] = True
 
             # F6: Current ratio increased
             ca_curr = _safe_get(balance, "Current Assets", col=0)
@@ -386,27 +414,20 @@ class FundamentalAnalyzer:
                 ca_prev = _safe_get(balance, "Current Assets", col=1)
                 cl_prev = _safe_get(balance, "Current Liabilities", col=1)
                 cr_prev = _safe_div(ca_prev, cl_prev)
-                if cr_curr is not None and cr_prev is not None and cr_curr > cr_prev:
-                    breakdown["F6"] = True
+                if cr_curr is not None and cr_prev is not None:
+                    breakdown["F6"] = cr_curr > cr_prev
             else:
-                if cr_curr is not None and cr_curr > 1.0:
-                    breakdown["F6"] = True
+                if cr_curr is not None:
+                    breakdown["F6"] = cr_curr > 1.0
 
             # F7: No new share dilution
-            # yfinance income_stmt sometimes has "Diluted Average Shares"
             diluted_curr = _safe_get(income, "Diluted Average Shares",
                                      fallbacks=["Basic Average Shares"], col=0)
             if has_two_years:
                 diluted_prev = _safe_get(income, "Diluted Average Shares",
                                          fallbacks=["Basic Average Shares"], col=1)
                 if diluted_curr is not None and diluted_prev is not None:
-                    if diluted_curr <= diluted_prev:
-                        breakdown["F7"] = True
-            else:
-                # Single year: only award if we have data confirming no dilution
-                if diluted_curr is not None:
-                    # Data exists for current year; no prior to compare, leave False
-                    pass
+                    breakdown["F7"] = diluted_curr <= diluted_prev
 
             # --- Operating Efficiency ---
             # F8: Gross margin increased
@@ -417,26 +438,39 @@ class FundamentalAnalyzer:
                 gp_prev = _safe_get(income, "Gross Profit", col=1)
                 rev_prev = _safe_get(income, "Total Revenue", col=1)
                 gm_prev = _safe_div(gp_prev, rev_prev)
-                if gm_curr is not None and gm_prev is not None and gm_curr > gm_prev:
-                    breakdown["F8"] = True
+                if gm_curr is not None and gm_prev is not None:
+                    breakdown["F8"] = gm_curr > gm_prev
             else:
-                if gm_curr is not None and gm_curr > 0.3:
-                    breakdown["F8"] = True
+                if gm_curr is not None:
+                    breakdown["F8"] = gm_curr > 0.3
 
             # F9: Asset turnover increased
             at_curr = _safe_div(rev_curr, total_assets_curr)
             if has_two_years:
                 rev_prev_val = _safe_get(income, "Total Revenue", col=1)
                 at_prev = _safe_div(rev_prev_val, total_assets_prev)
-                if at_curr is not None and at_prev is not None and at_curr > at_prev:
-                    breakdown["F9"] = True
+                if at_curr is not None and at_prev is not None:
+                    breakdown["F9"] = at_curr > at_prev
             else:
-                if at_curr is not None and at_curr > 0.5:
-                    breakdown["F9"] = True
+                if at_curr is not None:
+                    breakdown["F9"] = at_curr > 0.5
 
-            total = sum(1 for v in breakdown.values() if v)
-            signal = "STRONG" if total >= 7 else ("MODERATE" if total >= 4 else "WEAK")
-            result.update(score=total, breakdown=breakdown, signal=signal)
+            # Dynamic scoring: only count tests that were actually evaluable
+            tested = [v for v in breakdown.values() if v is not None]
+            passed = sum(1 for v in tested if v)
+            max_testable = len(tested)
+
+            if max_testable == 0:
+                signal = "N/A"
+            elif passed / max_testable >= 0.78:
+                signal = "STRONG"
+            elif passed / max_testable >= 0.44:
+                signal = "MODERATE"
+            else:
+                signal = "WEAK"
+
+            result.update(score=passed, max_score=max_testable,
+                          breakdown=breakdown, signal=signal)
 
         except Exception as exc:
             logger.warning("Piotroski F-Score failed: %s", exc)
@@ -511,7 +545,7 @@ class FundamentalAnalyzer:
                                balance: pd.DataFrame) -> dict:
         """Accruals ratio + FCF-to-NI quality assessment."""
         result = {"accruals_ratio": None, "fcf_ni_ratio": None,
-                  "score": 0, "max_score": 3, "assessment": "N/A"}
+                  "score": None, "max_score": 0, "assessment": "N/A"}
         try:
             ni = _safe_get(income, "Net Income") if not income.empty else None
             ocf = _safe_get(cashflow, "Operating Cash Flow") if not cashflow.empty else None
@@ -519,12 +553,14 @@ class FundamentalAnalyzer:
             total_assets = _safe_get(balance, "Total Assets") if not balance.empty else None
 
             score = 0
+            max_score = 0
 
             # Accruals ratio = (NI - OCF) / Total Assets
             accruals = None
             if ni is not None and ocf is not None and total_assets and total_assets > 0:
                 accruals = (ni - ocf) / total_assets
                 result["accruals_ratio"] = round(accruals, 4)
+                max_score += 2
                 # Low (negative) accruals = high quality
                 if accruals < -0.05:
                     score += 2  # excellent — cash earnings exceed accrual earnings
@@ -535,19 +571,24 @@ class FundamentalAnalyzer:
             fcf_ni = _safe_div(fcf, ni)
             if fcf_ni is not None:
                 result["fcf_ni_ratio"] = round(fcf_ni, 4)
+                max_score += 1
                 if fcf_ni > 1.0:
                     score += 1  # cash generation exceeds reported earnings
 
-            result["score"] = score
+            if max_score > 0:
+                result["score"] = score
+                result["max_score"] = max_score
 
-            if score >= 3:
-                result["assessment"] = "High quality — strong cash backing"
-            elif score == 2:
-                result["assessment"] = "Good quality — adequate cash backing"
-            elif score == 1:
-                result["assessment"] = "Moderate quality — some accrual concerns"
+                if score >= 3:
+                    result["assessment"] = "High quality — strong cash backing"
+                elif score == 2:
+                    result["assessment"] = "Good quality — adequate cash backing"
+                elif score == 1:
+                    result["assessment"] = "Moderate quality — some accrual concerns"
+                else:
+                    result["assessment"] = "Low quality — earnings may not be cash-backed"
             else:
-                result["assessment"] = "Low quality — earnings may not be cash-backed"
+                result["assessment"] = "Insufficient data"
 
         except Exception as exc:
             logger.warning("Earnings quality calc failed: %s", exc)
@@ -624,9 +665,10 @@ class FundamentalAnalyzer:
         """R&D intensity, capex/depreciation, buybacks, debt direction."""
         result = {"rd_intensity": None, "capex_depr_ratio": None,
                   "buyback_yield": None, "net_debt_change": None,
-                  "score": 0, "max_score": 4}
+                  "score": None, "max_score": 4}
         try:
             score = 0
+            has_data = False
 
             # R&D intensity
             revenue = _safe_get(income, "Total Revenue") if not income.empty else None
@@ -634,6 +676,7 @@ class FundamentalAnalyzer:
                            fallbacks=["Research Development"]) if not income.empty else None
 
             if rd is not None and revenue and revenue > 0:
+                has_data = True
                 rd_intensity = rd / revenue
                 result["rd_intensity"] = round(rd_intensity, 4)
                 # High R&D for tech = investing in moat
@@ -649,6 +692,7 @@ class FundamentalAnalyzer:
                 capex_abs = abs(capex) if capex is not None else None
                 capex_depr = _safe_div(capex_abs, depr)
                 if capex_depr is not None:
+                    has_data = True
                     result["capex_depr_ratio"] = round(capex_depr, 2)
                     if capex_depr > 1.0:
                         score += 1  # investing more than maintaining
@@ -674,7 +718,8 @@ class FundamentalAnalyzer:
                 if net_debt < 0:
                     score += 1  # paying down debt
 
-            result["score"] = score
+            if has_data:
+                result["score"] = score
 
         except Exception as exc:
             logger.warning("Capital allocation calc failed: %s", exc)
@@ -1025,7 +1070,9 @@ class FundamentalAnalyzer:
                             "detail": f"Shares outstanding increased {dilution*100:.1f}% YoY",
                         })
 
-            # 8. Altman Z-Score distress check (simplified)
+            # 8. Altman Z-Score distress check
+            # Use Z''-Score (international variant) for non-US companies:
+            #   removes asset turnover (x5) to eliminate accounting-standard bias
             if not income.empty and not balance.empty:
                 total_assets = _safe_get(balance, "Total Assets")
                 working_cap = None
@@ -1039,27 +1086,39 @@ class FundamentalAnalyzer:
                 market_cap = info.get("marketCap", 0) or 0
                 total_liabilities = _safe_get(balance, "Total Liabilities Net Minority Interest",
                                                fallbacks=["Total Liabilities"])
+                _country = info.get("country", "United States") or "United States"
+                is_international = _country != "United States"
 
-                if all(v is not None for v in [total_assets, working_cap, ebit, revenue]) and total_assets > 0:
+                if all(v is not None for v in [total_assets, working_cap, ebit]) and total_assets > 0:
                     x1 = working_cap / total_assets
                     x2 = (retained / total_assets) if retained else 0
                     x3 = ebit / total_assets
                     x4 = market_cap / total_liabilities if total_liabilities and total_liabilities > 0 else 1.0
-                    x5 = revenue / total_assets
 
-                    z = 1.2 * x1 + 1.4 * x2 + 3.3 * x3 + 0.6 * x4 + 1.0 * x5
+                    if is_international:
+                        # Altman Z''-Score for international / non-manufacturing
+                        z = 6.56 * x1 + 3.26 * x2 + 6.72 * x3 + 1.05 * x4
+                        distress_threshold = 1.1
+                        grey_threshold = 2.6
+                        variant = "Z''-Score (international)"
+                    else:
+                        x5 = revenue / total_assets if revenue is not None else 0
+                        z = 1.2 * x1 + 1.4 * x2 + 3.3 * x3 + 0.6 * x4 + 1.0 * x5
+                        distress_threshold = 1.81
+                        grey_threshold = 2.99
+                        variant = "Z-Score (original)"
 
-                    if z < 1.81:
+                    if z < distress_threshold:
                         flags.append({
-                            "flag": "Altman Z-Score distress zone",
+                            "flag": f"Altman {variant} distress zone",
                             "severity": "HIGH",
-                            "detail": f"Z-Score = {z:.2f} (< 1.81 = distress zone)",
+                            "detail": f"{variant} = {z:.2f} (< {distress_threshold} = distress zone)",
                         })
-                    elif z < 2.99:
+                    elif z < grey_threshold:
                         flags.append({
-                            "flag": "Altman Z-Score grey zone",
+                            "flag": f"Altman {variant} grey zone",
                             "severity": "LOW",
-                            "detail": f"Z-Score = {z:.2f} (1.81-2.99 = grey zone)",
+                            "detail": f"{variant} = {z:.2f} ({distress_threshold}-{grey_threshold} = grey zone)",
                         })
 
         except Exception as exc:
@@ -1110,30 +1169,35 @@ class FundamentalAnalyzerPlugin(_BaseAnalyzer):
     def analyze(self, ticker, ctx):
         result = self._analyzer.analyze(ticker)
 
-        # Normalise every sub-score to 0-1 range
-        def _norm(section_key: str) -> float:
+        # Normalise every sub-score to 0-1 range; None = data unavailable
+        def _norm(section_key: str):
             section = result.get(section_key, {})
-            s = section.get("score", 0)
+            s = section.get("score")
             m = section.get("max_score", 1)
+            if s is None or m == 0:
+                return None
             return s / max(m, 1)
 
-        health_n = _norm("health")
-        growth_n = _norm("growth")
-        val_n = _norm("valuation")
-        roic_n = _norm("roic")
-        piotroski_n = _norm("piotroski")
-        eq_n = _norm("earnings_quality")
-        ca_n = _norm("capital_allocation")
+        scores_map = {
+            "health": _norm("health"),
+            "growth": _norm("growth"),
+            "valuation": _norm("valuation"),
+            "roic": _norm("roic"),
+            "piotroski": _norm("piotroski"),
+            "earnings_quality": _norm("earnings_quality"),
+            "capital_alloc": _norm("capital_allocation"),
+        }
 
-        composite = (
-            health_n       * self._WEIGHTS["health"]
-            + growth_n     * self._WEIGHTS["growth"]
-            + val_n        * self._WEIGHTS["valuation"]
-            + roic_n       * self._WEIGHTS["roic"]
-            + piotroski_n  * self._WEIGHTS["piotroski"]
-            + eq_n         * self._WEIGHTS["earnings_quality"]
-            + ca_n         * self._WEIGHTS["capital_alloc"]
-        ) * 100
+        # Redistribute weights across available sub-scores
+        available = {k: v for k, v in scores_map.items() if v is not None}
+        total_weight = sum(self._WEIGHTS[k] for k in available)
+
+        if total_weight > 0:
+            composite = sum(
+                available[k] * self._WEIGHTS[k] for k in available
+            ) / total_weight * 100
+        else:
+            composite = 50.0  # No data — neutral fallback
 
         result["score"] = round(composite, 1)
         return result

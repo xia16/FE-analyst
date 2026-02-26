@@ -5,6 +5,7 @@ two-stage growth projection, dual terminal value methods, probability-weighted
 scenario analysis, and reverse DCF implied growth calculation.
 """
 
+import math
 import numpy as np
 import pandas as pd
 from scipy.optimize import brentq
@@ -14,6 +15,17 @@ from src.data_sources.macro_data import MacroDataClient
 from src.utils.logger import setup_logger
 
 logger = setup_logger("valuation")
+
+
+def _mos_to_score(mos: float, steepness: float = 25.0) -> float:
+    """Convert margin of safety % to 0-100 score via sigmoid.
+
+    Replaces the hard clamp ``max(-50, min(50, mos))``.
+    Maps: MOS=0 → 50, MOS=+50 → ~88, MOS=-50 → ~12, MOS=+100 → ~98.
+    Preserves ordering and compresses tails smoothly.
+    """
+    return 100.0 / (1.0 + math.exp(-mos / steepness))
+
 
 # Country risk premiums for WACC calculation
 COUNTRY_PREMIUM = {
@@ -57,6 +69,46 @@ SECTOR_EXIT_MULTIPLES = {
 }
 
 DEFAULT_EXIT_MULTIPLE = 13
+
+
+def _get_universe_peers(ticker: str, max_peers: int = 5) -> list[str] | None:
+    """Find peers from ai_moat_universe.yaml by category co-membership.
+
+    Returns list of peer tickers, or None if ticker not in universe.
+    """
+    import yaml
+    from pathlib import Path
+
+    yaml_path = Path(__file__).resolve().parents[2] / "configs" / "ai_moat_universe.yaml"
+    if not yaml_path.exists():
+        return None
+
+    try:
+        with open(yaml_path) as f:
+            universe = yaml.safe_load(f)
+    except Exception:
+        return None
+
+    categories = universe.get("categories", {})
+
+    for _cat_name, cat_data in categories.items():
+        companies = cat_data.get("companies", [])
+        cat_tickers: list[str] = []
+        found = False
+        for company in companies:
+            t = company.get("ticker")
+            adr = company.get("adr")
+            if t == ticker or adr == ticker:
+                found = True
+            if t:
+                cat_tickers.append(t)
+            if adr:
+                cat_tickers.append(adr)
+        if found:
+            peers = [t for t in cat_tickers if t != ticker]
+            return peers[:max_peers]
+
+    return None
 
 
 class ValuationAnalyzer:
@@ -397,8 +449,11 @@ class ValuationAnalyzer:
 
         Returns dict with both values and the averaged terminal value.
         """
-        # Method 1: Gordon Growth Model
-        gordon_tv = final_fcf * (1 + terminal_growth) / (wacc - terminal_growth)
+        # Method 1: Gordon Growth Model (with denominator guard)
+        if wacc <= terminal_growth:
+            gordon_tv = final_fcf * 25  # Cap at ~25x terminal FCF when WACC ≤ g
+        else:
+            gordon_tv = final_fcf * (1 + terminal_growth) / (wacc - terminal_growth)
 
         # Method 2: Exit Multiple
         exit_multiple_tv = None
@@ -416,9 +471,14 @@ class ValuationAnalyzer:
             except Exception:
                 exit_multiple_used = DEFAULT_EXIT_MULTIPLE
 
-        # Estimate terminal EBITDA from FCF.  Approximate EBITDA ~ FCF / 0.60
-        # (assumes ~60% FCF-to-EBITDA conversion, conservative for capital-light firms).
-        estimated_terminal_ebitda = final_fcf / 0.60
+        # Estimate terminal EBITDA from FCF using actual ratio when available
+        fcf_ebitda_ratio = self._get_fcf_ebitda_ratio(ticker)
+        if fcf_ebitda_ratio and 0.2 < fcf_ebitda_ratio < 0.95:
+            estimated_terminal_ebitda = final_fcf / fcf_ebitda_ratio
+        else:
+            # Fall back to 0.60 assumption (conservative, capex-heavy)
+            fcf_ebitda_ratio = 0.60
+            estimated_terminal_ebitda = final_fcf / 0.60
         exit_multiple_tv = estimated_terminal_ebitda * exit_multiple_used
 
         # Averaged terminal value
@@ -433,6 +493,43 @@ class ValuationAnalyzer:
             "exit_multiple_used": exit_multiple_used,
             "averaged": round(averaged_tv, 0),
         }
+
+    # ------------------------------------------------------------------
+    # FCF / EBITDA ratio helper
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _get_fcf_ebitda_ratio(ticker: str) -> float | None:
+        """Get actual FCF/EBITDA ratio from most recent annual financials."""
+        try:
+            import yfinance as yf
+            t = yf.Ticker(ticker)
+            cf = t.cashflow
+            inc = t.income_stmt
+            if cf is None or inc is None or cf.empty or inc.empty:
+                return None
+
+            fcf = None
+            for key in ["Free Cash Flow"]:
+                if key in cf.index:
+                    val = cf.loc[key].iloc[0]
+                    if pd.notna(val):
+                        fcf = float(val)
+                        break
+
+            ebitda = None
+            for key in ["EBITDA", "Normalized EBITDA"]:
+                if key in inc.index:
+                    val = inc.loc[key].iloc[0]
+                    if pd.notna(val):
+                        ebitda = float(val)
+                        break
+
+            if fcf and ebitda and ebitda > 0:
+                return fcf / ebitda
+            return None
+        except Exception:
+            return None
 
     # ------------------------------------------------------------------
     # Sensitivity analysis
@@ -611,8 +708,10 @@ class ValuationAnalyzer:
         net_debt = net_debt_info["net_debt"]
 
         info = yf.Ticker(ticker).info
-        shares = info.get("impliedSharesOutstanding") or info.get("sharesOutstanding", 1) or 1
-        current_price = info.get("currentPrice", info.get("regularMarketPrice", 0)) or 0
+        shares = info.get("impliedSharesOutstanding") or info.get("sharesOutstanding")
+        if not shares or shares <= 0:
+            return {"error": "Shares outstanding unavailable"}
+        current_price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
 
         stage1_years = 5
         stage2_years = 5
@@ -717,7 +816,7 @@ class ValuationAnalyzer:
         """Get median EV/EBITDA from peer companies for exit multiple."""
         if peers is None:
             try:
-                peers = self.fundamentals.get_peers(ticker)[:5]
+                peers = _get_universe_peers(ticker) or self.fundamentals.get_peers(ticker)[:5]
             except Exception:
                 return None
 
@@ -898,7 +997,9 @@ class ValuationAnalyzer:
 
             # Per share
             info = yf.Ticker(ticker).info
-            shares = info.get("impliedSharesOutstanding") or info.get("sharesOutstanding", 1) or 1
+            shares = info.get("impliedSharesOutstanding") or info.get("sharesOutstanding")
+            if not shares or shares <= 0:
+                return {"error": "Shares outstanding unavailable"}
             epv_per_share = epv_equity / shares
 
             return {
@@ -980,15 +1081,19 @@ class ValuationAnalyzer:
 
         # Per share
         info = yf.Ticker(ticker).info
-        shares = info.get("impliedSharesOutstanding") or info.get("sharesOutstanding", 1) or 1
+        shares = info.get("impliedSharesOutstanding") or info.get("sharesOutstanding")
+        if not shares or shares <= 0:
+            return {"error": "Shares outstanding unavailable", "warnings": warnings}
         intrinsic_per_share = equity_value / shares
-        current_price = info.get("currentPrice", info.get("regularMarketPrice", 0)) or 0
 
-        margin_of_safety = (
-            (intrinsic_per_share - current_price) / intrinsic_per_share * 100
-            if intrinsic_per_share > 0
-            else -100
-        )
+        current_price = info.get("currentPrice") or info.get("regularMarketPrice")
+        if not current_price or current_price <= 0:
+            warnings.append("Current price unavailable; MOS not computed")
+            margin_of_safety = None
+        elif intrinsic_per_share > 0:
+            margin_of_safety = (intrinsic_per_share - current_price) / intrinsic_per_share * 100
+        else:
+            margin_of_safety = -100
 
         return {
             "method": "Owner Earnings DCF",
@@ -1002,7 +1107,7 @@ class ValuationAnalyzer:
             "net_debt": round(net_debt, 0),
             "intrinsic_per_share": round(intrinsic_per_share, 2),
             "current_price": current_price,
-            "margin_of_safety_pct": round(margin_of_safety, 2),
+            "margin_of_safety_pct": round(margin_of_safety, 2) if margin_of_safety is not None else None,
             "warnings": warnings,
         }
 
@@ -1146,24 +1251,24 @@ class ValuationAnalyzer:
         composite_fv = sum(fair_values[k] * weights[k] for k in fair_values)
 
         # Get current price for MOS
-        current_price = 0
+        current_price = None
         for m in methods.values():
             if isinstance(m, dict) and m.get("current_price"):
                 current_price = m["current_price"]
                 break
 
-        margin_of_safety = (
-            (composite_fv - current_price) / composite_fv * 100
-            if composite_fv > 0
-            else -100
-        )
+        if not current_price or current_price <= 0 or composite_fv <= 0:
+            margin_of_safety = None
+        else:
+            margin_of_safety = (composite_fv - current_price) / composite_fv * 100
 
         return {
             "composite_fair_value": round(composite_fv, 2),
             "current_price": current_price,
-            "margin_of_safety_pct": round(margin_of_safety, 2),
+            "margin_of_safety_pct": round(margin_of_safety, 2) if margin_of_safety is not None else None,
             "verdict": (
-                "UNDERVALUED" if margin_of_safety > 15
+                "N/A" if margin_of_safety is None
+                else "UNDERVALUED" if margin_of_safety > 15
                 else "FAIR" if margin_of_safety > -10
                 else "OVERVALUED"
             ),
@@ -1191,8 +1296,10 @@ class ValuationAnalyzer:
 
         fcf_row = cf.loc["Free Cash Flow"]
         fcf_vals = fcf_row.dropna()
-        positive_fcfs = [float(v) for v in fcf_vals if float(v) > 0]
-        latest_fcf = float(fcf_vals.iloc[0]) if len(fcf_vals) > 0 else 0
+        if fcf_vals.empty:
+            return 0.0, ["No FCF data available (all NaN)"]
+        positive_fcfs = [float(v) for v in fcf_vals if pd.notna(v) and float(v) > 0]
+        latest_fcf = float(fcf_vals.iloc[0])
 
         if len(positive_fcfs) >= 2 and latest_fcf > 0:
             avg_prior = np.mean(positive_fcfs[1:]) if len(positive_fcfs) > 1 else positive_fcfs[0]
@@ -1243,8 +1350,10 @@ class ValuationAnalyzer:
         net_debt = net_debt_info["net_debt"]
 
         info = yf.Ticker(ticker).info
-        shares = info.get("impliedSharesOutstanding") or info.get("sharesOutstanding", 1) or 1
-        current_price = info.get("currentPrice", info.get("regularMarketPrice", 0)) or 0
+        shares = info.get("impliedSharesOutstanding") or info.get("sharesOutstanding")
+        if not shares or shares <= 0:
+            return {"error": "Shares outstanding unavailable"}
+        current_price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
 
         if current_price <= 0:
             return {"error": "No current price available"}
@@ -1354,8 +1463,20 @@ class ValuationAnalyzer:
         import yfinance as yf
 
         current_fcf, warnings = self._get_smoothed_fcf(ticker)
-        if current_fcf == 0.0 and warnings and "No FCF data" in warnings[0]:
-            return {"error": "No cash flow data available"}
+        if current_fcf <= 0:
+            # Try owner earnings as fallback before giving up
+            try:
+                oe, oe_breakdown, oe_warnings = self._get_owner_earnings(ticker)
+                if oe > 0:
+                    current_fcf = oe
+                    warnings.extend(oe_warnings)
+                    warnings.append("Using owner earnings as FCF proxy (raw FCF non-positive)")
+                else:
+                    return {"error": "No positive cash flow available for DCF",
+                            "current_fcf": current_fcf, "warnings": warnings}
+            except Exception:
+                return {"error": "No positive cash flow available for DCF",
+                        "current_fcf": current_fcf, "warnings": warnings}
 
         # --- Growth rate estimation ---
         growth_info = {"source": "override", "sources": {}}
@@ -1416,15 +1537,19 @@ class ValuationAnalyzer:
 
         # --- Shares outstanding ---
         info = yf.Ticker(ticker).info
-        shares = info.get("impliedSharesOutstanding") or info.get("sharesOutstanding", 1) or 1
+        shares = info.get("impliedSharesOutstanding") or info.get("sharesOutstanding")
+        if not shares or shares <= 0:
+            return {"error": "Shares outstanding unavailable", "warnings": warnings}
         intrinsic_per_share = equity_value / shares
-        current_price = info.get("currentPrice", info.get("regularMarketPrice", 0)) or 0
 
-        margin_of_safety = (
-            (intrinsic_per_share - current_price) / intrinsic_per_share * 100
-            if intrinsic_per_share > 0
-            else -100
-        )
+        current_price = info.get("currentPrice") or info.get("regularMarketPrice")
+        if not current_price or current_price <= 0:
+            warnings.append("Current price unavailable; MOS not computed")
+            margin_of_safety = None
+        elif intrinsic_per_share > 0:
+            margin_of_safety = (intrinsic_per_share - current_price) / intrinsic_per_share * 100
+        else:
+            margin_of_safety = -100
 
         # --- Sensitivity analysis ---
         sensitivity = self._sensitivity_analysis(
@@ -1466,9 +1591,10 @@ class ValuationAnalyzer:
             "shares_diluted": shares,
             "intrinsic_per_share": round(intrinsic_per_share, 2),
             "current_price": current_price,
-            "margin_of_safety_pct": round(margin_of_safety, 2),
+            "margin_of_safety_pct": round(margin_of_safety, 2) if margin_of_safety is not None else None,
             "verdict": (
-                "UNDERVALUED" if margin_of_safety > 15
+                "N/A" if margin_of_safety is None
+                else "UNDERVALUED" if margin_of_safety > 15
                 else "FAIR" if margin_of_safety > -10
                 else "OVERVALUED"
             ),
@@ -1496,7 +1622,10 @@ class ValuationAnalyzer:
         """Valuation by comparing multiples to peers."""
         ratios = self.fundamentals.get_key_ratios(ticker)
         if peers is None:
-            peers = self.fundamentals.get_peers(ticker)[:5]
+            # Try own-universe peers first (category co-membership), fall back to Finnhub
+            peers = _get_universe_peers(ticker)
+            if peers is None:
+                peers = self.fundamentals.get_peers(ticker)[:5]
 
         if not peers:
             return {"error": "No peer companies available"}
@@ -1559,8 +1688,7 @@ class ValuationAnalyzerPlugin(_BaseAnalyzer):
         else:
             mos_for_scoring = dcf.get("margin_of_safety_pct", 0)
 
-        mos_for_scoring = max(-50, min(50, mos_for_scoring))
-        dcf_score = max(0, min(100, 50 + mos_for_scoring))
+        dcf_score = _mos_to_score(mos_for_scoring)
 
         comps_score = 50
         try:

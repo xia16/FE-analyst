@@ -20,7 +20,11 @@ ADR_LOCAL_MAP = {
     "8035.T": None,      # Already local
     "FANUY": "6954.T",  # FANUC
     "HTHIY": "6501.T",  # Hitachi
-    "SHECY": "6723.T",  # Renesas
+    "SHECY": "4063.T",  # Shin-Etsu Chemical (NOT 6723.T Renesas)
+    "ATEYY": "6857.T",  # Advantest
+    "HOCPY": "7741.T",  # Hoya
+    "LSRCY": "6920.T",  # Lasertec
+    "DSCSY": "6146.T",  # Disco
     "SSNLF": "005930.KS",  # Samsung (Korean)
     # European
     "ASML": "ASML.AS",  # ASML Amsterdam
@@ -227,3 +231,201 @@ class InternationalAnalyzer:
         except Exception as e:
             logger.warning("FX sensitivity failed for %s: %s", ticker, e)
             return {"currency": currency, "note": f"FX analysis error: {e}"}
+
+    # ------------------------------------------------------------------
+    # Currency risk extensions
+    # ------------------------------------------------------------------
+
+    # Policy rates for hedge cost estimation.
+    # Updated: 2026-02-01.  Attempted live refresh via _refresh_policy_rates().
+    _POLICY_RATES = {
+        "JPY": 0.005,
+        "USD": 0.045,
+        "EUR": 0.035,
+        "TWD": 0.02,
+        "KRW": 0.035,
+        "CNY": 0.03,
+        "GBP": 0.045,
+        "ILS": 0.045,
+    }
+    _POLICY_RATES_UPDATED = "2026-02-01"
+    _RATES_STALE_DAYS = 90
+
+    @classmethod
+    def _refresh_policy_rates(cls) -> None:
+        """Attempt to fetch live short-term yield proxies from yfinance.
+
+        Falls back silently to static rates if fetches fail.
+        """
+        from datetime import datetime, timedelta
+
+        last = datetime.strptime(cls._POLICY_RATES_UPDATED, "%Y-%m-%d")
+        if (datetime.now() - last).days < 30:
+            return  # Refreshed recently enough
+
+        # Only refresh USD — ^IRX is a reliable 13-week T-bill proxy.
+        # No reliable yfinance proxies exist for JPY/EUR short rates;
+        # those stay at manually-maintained static values.
+        refreshed = False
+        try:
+            tk = yf.Ticker("^IRX")  # 13-week T-bill yield (% form)
+            hist = tk.history(period="5d")
+            if not hist.empty:
+                rate_pct = float(hist["Close"].iloc[-1])
+                if 0 < rate_pct < 20:
+                    cls._POLICY_RATES["USD"] = rate_pct / 100
+                    refreshed = True
+                    logger.info("USD policy rate refreshed: %.4f from ^IRX", rate_pct / 100)
+        except Exception:
+            pass
+        if refreshed:
+            cls._POLICY_RATES_UPDATED = datetime.now().strftime("%Y-%m-%d")
+
+    @classmethod
+    def _rates_staleness_warning(cls) -> str | None:
+        """Return a warning string if policy rates are stale."""
+        from datetime import datetime
+        last = datetime.strptime(cls._POLICY_RATES_UPDATED, "%Y-%m-%d")
+        age_days = (datetime.now() - last).days
+        if age_days > cls._RATES_STALE_DAYS:
+            return (
+                f"Policy rates last updated {cls._POLICY_RATES_UPDATED} "
+                f"({age_days} days ago). Hedge cost estimates may be inaccurate."
+            )
+        return None
+
+    @staticmethod
+    def _fx_exposure(ticker: str, country: str) -> dict | None:
+        """Report base currency and translation risk flag."""
+        if country not in CURRENCY_BY_COUNTRY:
+            return None
+        _, base_currency = CURRENCY_BY_COUNTRY[country]
+        return {
+            "base_currency": base_currency,
+            "primary_exposure": base_currency,
+            "usd_denominated": country == "United States",
+            "note": (
+                f"Functional currency: {base_currency}. "
+                "USD-denominated ADR adds translation risk."
+                if base_currency != "USD"
+                else "USD functional currency — no translation risk."
+            ),
+        }
+
+    @classmethod
+    def _hedge_cost_estimate(cls, country: str) -> dict | None:
+        """Estimate FX hedge cost from interest rate differential.
+
+        Hedge cost ~ USD_rate - foreign_rate (covered interest parity).
+        Attempts live rate refresh; warns if rates are stale.
+        """
+        if country not in CURRENCY_BY_COUNTRY:
+            return None
+
+        # Attempt live refresh
+        try:
+            cls._refresh_policy_rates()
+        except Exception:
+            pass
+
+        _, currency = CURRENCY_BY_COUNTRY[country]
+        home_rate = cls._POLICY_RATES.get(currency, 0.03)
+        usd_rate = cls._POLICY_RATES.get("USD", 0.045)
+        hedge_cost = usd_rate - home_rate
+
+        result = {
+            "currency": currency,
+            "estimated_annual_hedge_cost_pct": round(hedge_cost * 100, 2),
+            "rates_as_of": cls._POLICY_RATES_UPDATED,
+            "note": (
+                f"Hedging {currency} exposure costs ~{hedge_cost * 100:.1f}% "
+                "annually (rate differential proxy)"
+            ),
+        }
+
+        staleness = cls._rates_staleness_warning()
+        if staleness:
+            result["staleness_warning"] = staleness
+
+        return result
+
+    @staticmethod
+    def _boj_sensitivity(ticker: str, country: str) -> dict | None:
+        """Flag JPY holdings with BOJ policy sensitivity."""
+        if country != "Japan":
+            return None
+        return {
+            "flag": True,
+            "severity": "MEDIUM",
+            "note": (
+                "JPY-denominated. BOJ policy normalization risk: rate hikes "
+                "strengthen JPY, compressing ADR returns for USD investors."
+            ),
+        }
+
+
+# --- Plugin adapter for pipeline ---
+from src.analysis.base import BaseAnalyzer as _BaseAnalyzer
+
+
+class InternationalAnalyzerPlugin(_BaseAnalyzer):
+    name = "international"
+    default_weight = 0.08
+
+    def __init__(self):
+        self._analyzer = InternationalAnalyzer()
+
+    def analyze(self, ticker, ctx):
+        # Determine country
+        try:
+            info = yf.Ticker(ticker).info
+            country = info.get("country") or "United States"
+        except Exception:
+            country = "United States"
+
+        result = self._analyzer.analyze(ticker, country=country)
+
+        # Enrich with currency risk extensions
+        fx_exp = InternationalAnalyzer._fx_exposure(ticker, country)
+        if fx_exp:
+            result["fx_exposure"] = fx_exp
+        hedge = InternationalAnalyzer._hedge_cost_estimate(country)
+        if hedge:
+            result["hedge_cost"] = hedge
+        boj = InternationalAnalyzer._boj_sensitivity(ticker, country)
+        if boj:
+            result["boj_sensitivity"] = boj
+
+        # Compute a 0-100 score from international risk factors
+        score = 70.0  # Base score for any stock
+
+        # ADR premium penalty
+        adr = result.get("adr_analysis", {})
+        premium_z = adr.get("premium_z_score", 0)
+        if abs(premium_z) > 2:
+            score -= 15
+        elif abs(premium_z) > 1:
+            score -= 5
+
+        # FX sensitivity penalty
+        fx = result.get("fx_sensitivity", {})
+        correlation = abs(fx.get("correlation", 0))
+        if correlation > 0.4:
+            score -= 10
+        elif correlation > 0.2:
+            score -= 5
+
+        # Hedge cost drag
+        if hedge:
+            hc = abs(hedge.get("estimated_annual_hedge_cost_pct", 0))
+            if hc > 3:
+                score -= 10
+            elif hc > 1.5:
+                score -= 5
+
+        # US-listed stocks get minimal international risk
+        if country == "United States":
+            score = 80.0
+
+        result["score"] = round(max(0, min(100, score)), 1)
+        return result

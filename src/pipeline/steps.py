@@ -66,7 +66,7 @@ def run_registered_analyzers(ctx: PipelineContext) -> None:
                 ctx.set_analysis(ticker, name, result)
             except Exception as e:
                 logger.error("%s failed for %s: %s", name, ticker, e)
-                ctx.set_analysis(ticker, name, {"error": str(e), "score": 50})
+                ctx.set_analysis(ticker, name, {"error": str(e), "score": None})
 
 
 def run_specific_analyzers(analyzer_names: list[str]):
@@ -84,7 +84,7 @@ def run_specific_analyzers(analyzer_names: list[str]):
                     ctx.set_analysis(ticker, name, result)
                 except Exception as e:
                     logger.error("%s failed for %s: %s", name, ticker, e)
-                    ctx.set_analysis(ticker, name, {"error": str(e), "score": 50})
+                    ctx.set_analysis(ticker, name, {"error": str(e), "score": None})
     _step.__name__ = f"analyze_{'_'.join(analyzer_names)}"
     return _step
 
@@ -103,21 +103,25 @@ def compute_scores(ctx: PipelineContext) -> None:
         component_scores = {}
 
         for name, result in analyses.items():
-            if isinstance(result, dict) and "score" in result:
+            if isinstance(result, dict) and "score" in result and result["score"] is not None:
                 component_scores[name] = result["score"]
-            else:
-                component_scores[name] = 50.0
+            # Skip engines with None/missing scores instead of defaulting to 50
 
-        total_weight = sum(weights.get(k, 0.1) for k in component_scores)
-        if total_weight > 0:
+        available_weight = sum(weights.get(k, 0.1) for k in component_scores)
+        if available_weight > 0:
             composite = sum(
-                component_scores[k] * weights.get(k, 0.1) / total_weight
+                component_scores[k] * weights.get(k, 0.1) / available_weight
                 for k in component_scores
             )
         else:
             composite = 50.0
 
-        if composite >= 75:
+        # Minimum coverage threshold — refuse recommendation if <50% weight succeeded
+        insufficient_data = available_weight < 0.50
+
+        if insufficient_data:
+            rec = "INSUFFICIENT DATA"
+        elif composite >= 75:
             rec = "STRONG BUY"
         elif composite >= 60:
             rec = "BUY"
@@ -133,4 +137,5 @@ def compute_scores(ctx: PipelineContext) -> None:
             "recommendation": rec,
             "component_scores": {k: round(v, 1) for k, v in component_scores.items()},
             "weights": weights,
+            "weight_coverage_pct": round(available_weight * 100, 1),
         }
