@@ -11,6 +11,7 @@ import yaml
 import math
 import time
 import uuid
+import logging
 import sqlite3
 import subprocess
 import urllib.request
@@ -35,9 +36,17 @@ from telegram_bot import (
     get_portfolio_summary, get_realized_pnl, get_realized_summary, init_db,
 )
 import db_persistence
+import stock_index
+
+logger = logging.getLogger("server")
 
 # Project root
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+# Patch yfinance with retry-on-429 for server-side quote/chart calls
+sys.path.insert(0, str(PROJECT_ROOT))
+from src.utils.yf_session import patch_yfinance
+patch_yfinance()
 
 app = FastAPI(title="FE-Analyst Dashboard API", version="2.0.0")
 app.add_middleware(
@@ -677,15 +686,26 @@ def check_buy_opportunities():
 # ---------------------------------------------------------------------------
 scheduler = BackgroundScheduler()
 scheduler.add_job(check_buy_opportunities, "cron", hour=9, minute=0)
+stock_index.schedule_refresh(scheduler)
 scheduler.start()
 
 
 # ---------------------------------------------------------------------------
-# Startup — restore portfolio DB from GCS (if available)
+# Startup — restore portfolio DB from GCS + build stock index
 # ---------------------------------------------------------------------------
 @app.on_event("startup")
 def _startup_restore_db():
     db_persistence.restore()
+
+
+@app.on_event("startup")
+def _startup_build_stock_index():
+    """Build the comprehensive stock search index on startup."""
+    try:
+        count = stock_index.build_index()
+        logger.info("Stock index ready: %d stocks", count)
+    except Exception as e:
+        logger.error("Failed to build stock index on startup: %s", e)
 
 
 # ---------------------------------------------------------------------------
@@ -778,6 +798,93 @@ EXCHANGE_COUNTRY = {
     "TAI": "Taiwan", "TWO": "Taiwan",
     "SGX": "Singapore",
 }
+
+
+# ---------------------------------------------------------------------------
+# Search — comprehensive stock index + Yahoo fallback
+# ---------------------------------------------------------------------------
+
+@app.get("/api/search/stocks")
+def search_stocks():
+    """Return the full stock index for frontend preloading (~6,800 stocks)."""
+    stocks, updated_at = stock_index.get_all_stocks()
+    return {
+        "stocks": stocks,
+        "count": len(stocks),
+        "updated_at": updated_at,
+    }
+
+
+# Yahoo search cache: {query: (timestamp, results)}
+_yahoo_search_cache: dict[str, tuple[datetime, list]] = {}
+_YAHOO_SEARCH_TTL = timedelta(minutes=5)
+
+
+@app.get("/api/search/yahoo")
+def search_yahoo(q: str = ""):
+    """Proxy Yahoo Finance search API for international / unlisted stocks."""
+    query = q.strip()
+    if len(query) < 2:
+        return {"results": []}
+
+    # Check cache
+    if query in _yahoo_search_cache:
+        cached_time, cached_results = _yahoo_search_cache[query]
+        if datetime.utcnow() - cached_time < _YAHOO_SEARCH_TTL:
+            return {"results": cached_results}
+
+    try:
+        qs = urllib.parse.urlencode({
+            "q": query,
+            "quotesCount": 8,
+            "newsCount": 0,
+            "listsCount": 0,
+        })
+        urls = [
+            f"https://query1.finance.yahoo.com/v1/finance/search?{qs}",
+            f"https://query2.finance.yahoo.com/v1/finance/search?{qs}",
+        ]
+        ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        data = None
+        for url in urls:
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": ua})
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                break
+            except Exception:
+                continue
+
+        if not data:
+            return {"results": []}
+
+        results = []
+        for quote in data.get("quotes", []):
+            qtype = quote.get("quoteType", "")
+            if qtype not in ("EQUITY", "ETF", "MUTUALFUND"):
+                continue
+            results.append({
+                "ticker": quote.get("symbol", ""),
+                "name": quote.get("shortname") or quote.get("longname") or "",
+                "exchange": quote.get("exchDisp") or quote.get("exchange") or "",
+                "type": qtype,
+            })
+
+        # Cache results
+        _yahoo_search_cache[query] = (datetime.utcnow(), results)
+
+        # Prune old cache entries (keep it under 500)
+        if len(_yahoo_search_cache) > 500:
+            cutoff = datetime.utcnow() - _YAHOO_SEARCH_TTL
+            stale = [k for k, (t, _) in _yahoo_search_cache.items() if t < cutoff]
+            for k in stale:
+                del _yahoo_search_cache[k]
+
+        return {"results": results}
+
+    except Exception as e:
+        logger.error("Yahoo search failed: %s", e)
+        return {"results": []}
 
 
 @app.get("/api/ticker-info/{ticker}")

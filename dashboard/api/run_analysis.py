@@ -14,6 +14,11 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# Patch yfinance BEFORE importing any analysis modules —
+# gives all engines retry-on-429 and a shared .info cache.
+from src.utils.yf_session import patch_yfinance
+patch_yfinance()
+
 # Force ALL loggers to stderr AFTER imports so we catch module-level handlers
 from src.analysis.scoring import StockScorer
 from src.data_sources.insider_congress import InsiderCongressClient
