@@ -1,9 +1,10 @@
 """Market data client - prices, volume, OHLCV data.
 
-Primary: yfinance | Fallback: finnhub, alpaca
+Primary: yfinance | Fallback: TwelveData REST API
 """
 
 import pandas as pd
+import requests as req_lib
 import yfinance as yf
 
 from src.config import Keys
@@ -13,6 +14,76 @@ from src.utils.logger import setup_logger
 logger = setup_logger("market_data")
 cache = DataCache("price_historical")
 
+# TwelveData period → approximate calendar days for outputsize
+_PERIOD_TO_DAYS = {
+    "1d": 1, "5d": 5, "1mo": 30, "3mo": 90, "6mo": 180,
+    "1y": 365, "2y": 730, "5y": 1825, "10y": 3650, "max": 5000,
+}
+
+
+def _fetch_twelvedata_history(ticker: str, period: str = "1y", interval: str = "1d") -> pd.DataFrame:
+    """Fetch OHLCV from TwelveData REST API (fallback when yfinance is rate-limited).
+
+    TwelveData free tier: 800 calls/day, 8 calls/min.
+    Returns DataFrame with yfinance-compatible column names (Open, High, Low, Close, Volume).
+    """
+    api_key = Keys.TWELVE_DATA
+    if not api_key:
+        logger.debug("No TwelveData API key, skipping fallback")
+        return pd.DataFrame()
+
+    # Map yfinance interval to TwelveData format
+    interval_map = {"1d": "1day", "1wk": "1week", "1mo": "1month"}
+    td_interval = interval_map.get(interval, "1day")
+
+    days = _PERIOD_TO_DAYS.get(period, 365)
+    outputsize = min(days, 5000)
+
+    try:
+        logger.info("TwelveData fallback: %s (period=%s, outputsize=%d)", ticker, period, outputsize)
+        resp = req_lib.get(
+            "https://api.twelvedata.com/time_series",
+            params={
+                "symbol": ticker,
+                "interval": td_interval,
+                "outputsize": outputsize,
+                "apikey": api_key,
+                "format": "JSON",
+            },
+            timeout=30,
+        )
+        data = resp.json()
+
+        if data.get("status") == "error":
+            logger.warning("TwelveData error for %s: %s", ticker, data.get("message", "unknown"))
+            return pd.DataFrame()
+
+        values = data.get("values", [])
+        if not values:
+            return pd.DataFrame()
+
+        df = pd.DataFrame(values)
+        df["datetime"] = pd.to_datetime(df["datetime"])
+        df = df.set_index("datetime").sort_index()
+
+        # Rename to match yfinance column names
+        df = df.rename(columns={
+            "open": "Open", "high": "High", "low": "Low",
+            "close": "Close", "volume": "Volume",
+        })
+        for col in ["Open", "High", "Low", "Close"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+        if "Volume" in df.columns:
+            df["Volume"] = pd.to_numeric(df["Volume"], errors="coerce").fillna(0).astype(int)
+
+        logger.info("TwelveData: got %d rows for %s", len(df), ticker)
+        return df
+
+    except Exception as e:
+        logger.warning("TwelveData fetch failed for %s: %s", ticker, e)
+        return pd.DataFrame()
+
 
 class MarketDataClient:
     """Fetch historical and current market data."""
@@ -21,6 +92,9 @@ class MarketDataClient:
         self, ticker: str, period: str = "1y", interval: str = "1d"
     ) -> pd.DataFrame:
         """Get OHLCV price history for a ticker.
+
+        Tries yfinance first, falls back to TwelveData if yfinance returns
+        empty data (usually due to Yahoo Finance rate limiting / 429 errors).
 
         Args:
             ticker: Stock symbol (e.g. "AAPL")
@@ -33,9 +107,18 @@ class MarketDataClient:
             logger.info("Cache hit: %s", cache_key)
             return cached
 
+        # Primary: yfinance
         logger.info("Fetching price history: %s (period=%s)", ticker, period)
-        stock = yf.Ticker(ticker)
-        df = stock.history(period=period, interval=interval)
+        try:
+            stock = yf.Ticker(ticker)
+            df = stock.history(period=period, interval=interval)
+        except Exception as e:
+            logger.warning("yfinance history failed for %s: %s", ticker, e)
+            df = pd.DataFrame()
+
+        # Fallback: TwelveData (if yfinance returned empty/failed)
+        if df.empty:
+            df = _fetch_twelvedata_history(ticker, period, interval)
 
         if not df.empty:
             cache.set_df(cache_key, df)

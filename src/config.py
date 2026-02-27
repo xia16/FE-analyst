@@ -28,7 +28,7 @@ class Keys:
     FRED = os.getenv("FRED_API_KEY", "")
     SIMFIN = os.getenv("SIMFIN_API_KEY", "")
     FMP = os.getenv("FMP_API_KEY", "")
-    TWELVE_DATA = os.getenv("TWELVE_DATA_API_KEY", "")
+    TWELVE_DATA = os.getenv("TWELVEDATA_API_KEY", "") or os.getenv("TWELVE_DATA_API_KEY", "")
     ALPACA_KEY = os.getenv("ALPACA_API_KEY", "")
     ALPACA_SECRET = os.getenv("ALPACA_SECRET_KEY", "")
     REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID", "")
