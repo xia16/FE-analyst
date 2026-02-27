@@ -980,14 +980,14 @@ def _run_analysis_subprocess(ticker: str) -> dict:
     try:
         result = subprocess.run(
             [str(ANALYSIS_PYTHON), str(ANALYSIS_RUNNER), ticker],
-            capture_output=True, text=True, timeout=180,
+            capture_output=True, text=True, timeout=240,
             cwd=str(PROJECT_ROOT),
         )
         if result.returncode == 0:
             return json.loads(result.stdout)
         return {"error": result.stderr or "Analysis failed"}
     except subprocess.TimeoutExpired:
-        return {"error": "Analysis timed out after 180s"}
+        return {"error": "Analysis timed out after 240s"}
     except Exception as e:
         return {"error": str(e)}
 

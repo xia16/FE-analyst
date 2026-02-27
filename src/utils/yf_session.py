@@ -4,7 +4,7 @@ Fixes Yahoo Finance 429 (Too Many Requests) errors that cause
 "INSUFFICIENT DATA" recommendations by:
 
 1. Pre-request rate limiting (min 0.5s between Yahoo requests)
-2. Retry with exponential backoff (2s, 4s, 8s, 16s, 32s) on 429/5xx
+2. Retry with exponential backoff (1s, 2s, 4s) on 429/5xx
 3. Connection pooling via shared requests.Session
 4. Shared YfData instance — crumb/cookie fetched once, reused by all
    Ticker instances (eliminates 20+ redundant auth requests per analysis)
@@ -86,8 +86,8 @@ def get_session() -> requests.Session:
 
         session = _RateLimitedSession()
         retry = Retry(
-            total=5,
-            backoff_factor=2.0,           # waits: 2s, 4s, 8s, 16s, 32s
+            total=3,
+            backoff_factor=1.0,           # waits: 1s, 2s, 4s (total 7s max)
             status_forcelist=[429, 500, 502, 503, 504],
             respect_retry_after_header=True,
             allowed_methods=["GET", "HEAD", "OPTIONS"],
@@ -102,7 +102,7 @@ def get_session() -> requests.Session:
 
         _session = session
         logger.info(
-            "Created shared yfinance session: rate_limit=%.1f req/s, retries=5, backoff=2s",
+            "Created shared yfinance session: rate_limit=%.1f req/s, retries=3, backoff=1s",
             1.0 / _MIN_REQUEST_INTERVAL,
         )
         return _session
@@ -139,7 +139,7 @@ def patch_yfinance():
     - Info cache: ticker.info fetched ONCE per ticker, cached 5min
       (eliminates 12+ redundant quoteSummary requests per analysis)
     - Rate limiting: 0.5s between Yahoo requests (prevents triggering 429)
-    - Retry adapter: 5 retries with exponential backoff on 429/5xx
+    - Retry adapter: 3 retries with exponential backoff on 429/5xx
 
     Safe to call multiple times — only patches once.
     """
