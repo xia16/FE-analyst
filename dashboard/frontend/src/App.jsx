@@ -555,9 +555,25 @@ export default function App() {
   const [selectedTicker, setSelectedTicker] = useState(null)
   const [selectedReportPath, setSelectedReportPath] = useState(null)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [allStocks, setAllStocks] = useState([])
+  const [holdingTickers, setHoldingTickers] = useState(new Set())
   const { data: alertData } = useAlerts()
 
   const { data: domainMeta } = useDomainMeta(activeDomain)
+
+  // Fetch comprehensive stock index on mount
+  useEffect(() => {
+    fetch('/api/search/stocks')
+      .then(r => r.json())
+      .then(data => {
+        const stocks = data.stocks || []
+        setAllStocks(stocks)
+        // Build set of holding tickers for prioritization
+        const holdings = new Set(stocks.filter(s => s.source === 'holding').map(s => s.ticker))
+        setHoldingTickers(holdings)
+      })
+      .catch(err => console.warn('Failed to load stock index:', err))
+  }, [])
 
   // Global keyboard shortcut: Cmd/Ctrl+K to open search
   useEffect(() => {
@@ -614,6 +630,8 @@ export default function App() {
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
         onSearch={handleSearch}
+        allStocks={allStocks}
+        holdingTickers={holdingTickers}
       />
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
         {activeView === 'myportfolio' && (
@@ -632,7 +650,7 @@ export default function App() {
           <AlertsView onSelectTicker={handleSelectTicker} domains={domains} />
         )}
         {activeView === 'detail' && (
-          <StockDetailView ticker={selectedTicker} setTicker={setSelectedTicker} />
+          <StockDetailView ticker={selectedTicker} setTicker={setSelectedTicker} allStocks={allStocks} holdingTickers={holdingTickers} />
         )}
         {activeView === 'generate' && <GenerateReportView onViewReport={handleViewReport} />}
         {activeView === 'reports' && <ReportsView initialPath={selectedReportPath} />}

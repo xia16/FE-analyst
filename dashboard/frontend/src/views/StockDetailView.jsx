@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAnalysis, useThesis, useThesisStatus } from '../hooks'
 import { addToSearchHistory } from '../components/SearchOverlay'
+import TickerAutocomplete from '../components/TickerAutocomplete'
 import { Card, Badge, Spinner, fmt, fmtPct, fmtCurrency, getScoreColor, RECOMMENDATION_COLORS } from '../components/shared'
 import OverviewTab from './stock-detail/OverviewTab'
 import TechnicalsTab from './stock-detail/TechnicalsTab'
@@ -22,7 +23,7 @@ const TABS = [
   { id: 'thesis', label: 'Thesis' },
 ]
 
-export default function StockDetailView({ ticker, setTicker }) {
+export default function StockDetailView({ ticker, setTicker, allStocks = [], holdingTickers = new Set() }) {
   const [inputVal, setInputVal] = useState(ticker || '')
   const [activeTab, setActiveTab] = useState('overview')
   const [quoteData, setQuoteData] = useState(null)
@@ -58,6 +59,15 @@ export default function StockDetailView({ ticker, setTicker }) {
     setInputVal(ticker || '')
   }, [ticker])
 
+  const handleAutocompleteSelect = useCallback((t, name) => {
+    const upper = t.trim().toUpperCase()
+    if (upper) {
+      setInputVal(upper)
+      setTicker(upper)
+      setActiveTab('overview')
+    }
+  }, [setTicker])
+
   const handleSubmit = (e) => {
     e.preventDefault()
     if (inputVal.trim()) {
@@ -87,17 +97,20 @@ export default function StockDetailView({ ticker, setTicker }) {
 
   return (
     <div className="space-y-6 animate-slide-in">
-      {/* Search bar */}
+      {/* Search bar with autocomplete */}
       <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2">
-        <input
-          value={inputVal}
-          onChange={(e) => setInputVal(e.target.value)}
-          placeholder="Enter ticker (e.g. ATEYY, HTHIY, 8035.T)"
-          className="flex-1 bg-[#1e2130] border border-[#2a2d3e] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#3b82f6] transition-colors"
+        <TickerAutocomplete
+          allStocks={allStocks}
+          holdings={holdingTickers}
+          query={inputVal}
+          onQueryChange={setInputVal}
+          onSelect={handleAutocompleteSelect}
+          placeholder="Search by ticker or company name..."
+          className="flex-1"
         />
         <button
           type="submit"
-          className="px-6 py-2 bg-[#3b82f6] text-white text-sm font-medium rounded-lg hover:bg-[#2563eb] transition-colors"
+          className="px-6 py-2 bg-[#3b82f6] text-white text-sm font-medium rounded-lg hover:bg-[#2563eb] transition-colors flex-shrink-0"
         >
           Load
         </button>

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "/Users/xia/Desktop/FE-analyst/dashboard/api/venv/bin/python",
+      "runtimeArgs": ["-m", "uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8050", "--app-dir", "/Users/xia/Desktop/FE-analyst/dashboard/api"],
+      "port": 8050
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "/Users/xia/Desktop/FE-analyst/dashboard/frontend"],
+      "port": 3050
+    }
+  ]
+}

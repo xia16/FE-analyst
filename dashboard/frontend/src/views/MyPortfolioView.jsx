@@ -382,6 +382,11 @@ export default function MyPortfolioView({ onSelectTicker }) {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[10px] text-[#8b8d97]">{summary.count || 0} positions</span>
+          {data?.timestamp && (
+            <span className="text-[10px] text-[#8b8d97]">
+              · Updated {new Date(data.timestamp + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
           <button
             onClick={refetch}
             className="px-3 py-2 rounded-lg text-xs font-medium text-[#8b8d97] hover:text-white hover:bg-[#1e2130] transition-colors"
