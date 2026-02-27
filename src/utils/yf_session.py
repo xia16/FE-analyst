@@ -1,22 +1,28 @@
-"""Shared yfinance session with retry logic, rate limiting, and caching.
+"""Shared yfinance session with rate limiting and request deduplication.
 
 Fixes Yahoo Finance 429 (Too Many Requests) errors that cause
-"INSUFFICIENT DATA" recommendations by:
+"INSUFFICIENT DATA" recommendations by dramatically reducing request count:
 
-1. Pre-request rate limiting (min 0.5s between Yahoo requests)
-2. Retry with exponential backoff (1s, 2s, 4s) on 429/5xx
-3. Connection pooling via shared requests.Session
-4. Shared YfData instance — crumb/cookie fetched once, reused by all
+1. Shared YfData instance — crumb/cookie fetched once, reused by all
    Ticker instances (eliminates 20+ redundant auth requests per analysis)
-5. In-process caching of ticker.info to eliminate redundant API calls
-   (a single stock analysis calls .info 12+ times across engines)
+2. In-process caching of ticker.info to eliminate redundant API calls
+   (a single stock analysis calls .info 12+ times across engines → 1)
+3. Pre-request rate limiting (min 0.5s between Yahoo requests)
+4. Connection pooling via shared requests.Session
+
+Net effect: ~50 Yahoo requests per analysis → ~8, spread over ~4s.
+
+NOTE: We intentionally do NOT retry on 429 at the urllib3 level. Retrying
+on persistent rate limits interacts badly with yfinance's internal strategy
+switching (basic → csrf), causing cascading retry storms (60s+ per request).
+Instead, we prevent 429s by reducing total requests + rate limiting.
 
 Usage:
     from src.utils.yf_session import patch_yfinance
     patch_yfinance()  # Call once at startup
 
 After patching, all `yf.Ticker()` calls throughout the codebase
-automatically use the rate-limited, retry-enabled session.
+automatically use the rate-limited session with shared auth.
 """
 
 import time
@@ -26,7 +32,6 @@ import logging
 
 import requests
 from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 import yfinance as yf
 
@@ -75,7 +80,7 @@ class _RateLimitedSession(requests.Session):
 
 
 def get_session() -> requests.Session:
-    """Get or create the shared rate-limited Session with retry adapter."""
+    """Get or create the shared rate-limited Session with connection pooling."""
     global _session
     if _session is not None:
         return _session
@@ -85,15 +90,11 @@ def get_session() -> requests.Session:
             return _session
 
         session = _RateLimitedSession()
-        retry = Retry(
-            total=3,
-            backoff_factor=1.0,           # waits: 1s, 2s, 4s (total 7s max)
-            status_forcelist=[429, 500, 502, 503, 504],
-            respect_retry_after_header=True,
-            allowed_methods=["GET", "HEAD", "OPTIONS"],
-        )
+
+        # Connection pooling only — no urllib3 retries.
+        # yfinance handles 429 internally via strategy switching (basic ↔ csrf).
+        # Adding urllib3 retries on 429 causes cascading retry storms.
         adapter = HTTPAdapter(
-            max_retries=retry,
             pool_connections=10,
             pool_maxsize=10,
         )
@@ -102,7 +103,7 @@ def get_session() -> requests.Session:
 
         _session = session
         logger.info(
-            "Created shared yfinance session: rate_limit=%.1f req/s, retries=3, backoff=1s",
+            "Created shared yfinance session: rate_limit=%.1f req/s, pooled connections",
             1.0 / _MIN_REQUEST_INTERVAL,
         )
         return _session
@@ -131,15 +132,15 @@ def _get_cached_info(original_fget, self):
 
 
 def patch_yfinance():
-    """Monkey-patch yf.Ticker to use shared rate-limited, retry-enabled session.
+    """Monkey-patch yf.Ticker to use shared rate-limited session with caching.
 
-    Key optimizations:
-    - Shared YfData: crumb/cookie fetched ONCE, reused by all Ticker instances
-      (eliminates 20+ redundant /v1/test/getcrumb requests per analysis)
-    - Info cache: ticker.info fetched ONCE per ticker, cached 5min
-      (eliminates 12+ redundant quoteSummary requests per analysis)
-    - Rate limiting: 0.5s between Yahoo requests (prevents triggering 429)
-    - Retry adapter: 3 retries with exponential backoff on 429/5xx
+    Key optimizations (biggest impact first):
+    1. Shared YfData: crumb/cookie fetched ONCE, reused by all Ticker instances
+       (eliminates 20+ redundant /v1/test/getcrumb requests per analysis)
+    2. Info cache: ticker.info fetched ONCE per ticker, cached 5min
+       (eliminates 12+ redundant quoteSummary requests per analysis)
+    3. Rate limiting: 0.5s between Yahoo requests (prevents triggering 429)
+    4. Connection pooling: shared TCP connections reduce overhead
 
     Safe to call multiple times — only patches once.
     """
@@ -177,7 +178,7 @@ def patch_yfinance():
     yf.Ticker.info = cached_info
 
     _patched = True
-    logger.info("Patched yfinance: shared YfData + rate limiting + retry + info cache")
+    logger.info("Patched yfinance: shared YfData + rate limiting + info cache")
 
 
 def clear_info_cache(ticker: str = None):
