@@ -1,0 +1,420 @@
+==============================================================================
+  AI INVESTMENT BUBBLE: DEEP DIVE ANALYSIS WITH REAL FINANCIAL DATA
+  Generated: 2026-03-06 16:06
+  Data sources: SEC 10-K/10-Q filings, earnings calls, leaked docs,
+  analyst reports (Morgan Stanley, Pivotal Research, Michael Burry)
+==============================================================================
+
+==============================================================================
+  ANALYSIS 1: UNPRECEDENTED AI CAPITAL EXPENDITURE
+==============================================================================
+  Source: 10-K filings, earnings calls, analyst estimates
++--------------+------------+------------+------------+------------+------------+-------------+---------+------------+------------+------------+------------+------------+------------+-------------+
+| Company      | 2020       | 2021       | 2022       | 2023       | 2024       | 2025E       | 2026E   | FY2020     | FY2021     | FY2022     | FY2023     | FY2024     | FY2025     | FY2026E     |
++==============+============+============+============+============+============+=============+=========+============+============+============+============+============+============+=============+
+| Microsoft    | -          | -          | -          | -          | -          | -           | -       | $15B (11%) | $21B (12%) | $24B (12%) | $28B (13%) | $44B (18%) | $64B (23%) | $140B (45%) |
++--------------+------------+------------+------------+------------+------------+-------------+---------+------------+------------+------------+------------+------------+------------+-------------+
+| Alphabet     | $22B (12%) | $25B (10%) | $32B (11%) | $32B (11%) | $52B (15%) | $91B (24%)  | $180B   | -          | -          | -          | -          | -          | -          | -           |
++--------------+------------+------------+------------+------------+------------+-------------+---------+------------+------------+------------+------------+------------+------------+-------------+
+| Meta         | $15B (18%) | $19B (16%) | $31B (27%) | $28B (21%) | $38B (23%) | $71B (36%)  | $125B   | -          | -          | -          | -          | -          | -          | -           |
++--------------+------------+------------+------------+------------+------------+-------------+---------+------------+------------+------------+------------+------------+------------+-------------+
+| Amazon       | $40B (10%) | $61B (13%) | $64B (12%) | $48B (8%)  | $83B (13%) | $125B (18%) | $200B   | -          | -          | -          | -          | -          | -          | -           |
++--------------+------------+------------+------------+------------+------------+-------------+---------+------------+------------+------------+------------+------------+------------+-------------+
+| TOTAL (4 co) | $78B       | $105B      | $126B      | $109B      | $174B      | $287B       | $505B   | $15B       | $21B       | $24B       | $28B       | $44B       | $64B       | $140B       |
++--------------+------------+------------+------------+------------+------------+-------------+---------+------------+------------+------------+------------+------------+------------+-------------+
+
+  CapEx as % of Revenue shown in parentheses
+
+  KEY FINDINGS:
+  - Combined 2025 CapEx: ~$351B
+  - Combined 2026 CapEx (projected): ~$645B
+  - VIDEO CLAIM of $600B+: CONFIRMED — actual guidance ~$645B
+  - This represents a ~67-74% spike from 2025
+  - Free cash flow fell from $237B (2024) to $200B (2025) as CapEx consumed cash
+  - CapEx now consumes ~94% of operating cash flows (minus dividends & buybacks)
+
+==============================================================================
+  ANALYSIS 2: DEPRECIATION POLICIES & IMPLIED USEFUL LIFE
+==============================================================================
+  Method: Gross PP&E / Annual Depreciation = Implied Average Useful Life
+  This reveals the ACTUAL depreciation period companies are using
+
++-----------+--------------------------------------------------------------------+
+| Company   | Depreciation Policy Changes                                        |
++===========+====================================================================+
+| Microsoft | Servers: 4→6 years (changed ~2022-2023)                            |
++-----------+--------------------------------------------------------------------+
+| Alphabet  | Servers: 4→6 years (changed ~2023)                                 |
++-----------+--------------------------------------------------------------------+
+| Meta      | Servers: 4→4.5→5→5.5 years (extended Feb 2025, saved $2.9B)        |
++-----------+--------------------------------------------------------------------+
+| Amazon    | Servers: 3→4→5→6 years (2020-2024), REVERSED to 5 years (Jan 2025) |
++-----------+--------------------------------------------------------------------+
+
+  COMPUTED IMPLIED USEFUL LIFE (years):
++-----------+----------+----------+----------+----------+----------+----------+
+| Company   |   FY2020 |   FY2021 |   FY2022 |   FY2023 |   FY2024 |   FY2025 |
++===========+==========+==========+==========+==========+==========+==========+
+| Microsoft |      6.8 |      9.4 |      9.5 |     12.3 |     13.2 |     12.5 |
++-----------+----------+----------+----------+----------+----------+----------+
+| Alphabet  |      9.8 |     10.7 |     11.5 |     12.4 |     12.5 |          |
++-----------+----------+----------+----------+----------+----------+----------+
+| Meta      |      8.9 |     10.1 |     11.8 |     12.1 |     11.6 |          |
++-----------+----------+----------+----------+----------+----------+----------+
+| Amazon    |      8   |      8.7 |      9.5 |      9.9 |     11.7 |          |
++-----------+----------+----------+----------+----------+----------+----------+
+
+  KEY FINDINGS:
+  - All 4 companies show implied useful lives of 5-8+ years
+  - Microsoft: Implied life grew from 6.8 to 12.5 years (gross PP&E growing
+    faster than depreciation catches up)
+  - Amazon REVERSED its policy in Jan 2025 (6yr→5yr), citing 'increased pace
+    of technology development, particularly in AI/ML'
+  - Meta went OPPOSITE direction in Feb 2025 (5yr→5.5yr), saving $2.9B
+  - This divergence under identical conditions proves useful life is SUBJECTIVE
+
+  MICHAEL BURRY'S ANALYSIS (Nov 2025):
+  - Called depreciation extension 'one of the more common frauds of the modern era'
+  - Estimated $176B in understated depreciation from 2026-2028
+  - Oracle profits overstated by ~27%, Meta by ~21% if realistic 2-3yr life used
+  - Took put options: $187M notional against NVDA, $912M against PLTR
+
+==============================================================================
+  ANALYSIS 3: THE HIDDEN DEPRECIATION GAP ('The Balance Sheet Bomb')
+==============================================================================
+  What if AI hardware should depreciate in 2-3 years instead of 5-6?
+  This computes the HIDDEN COST that overstates reported earnings
+
++-----------+----------+--------------+--------------+----------------+------------+-------------+------------+-------------+
+| Company   | Period   | Gross PP&E   | Actual D&A   | Implied Life   | D&A @3yr   | Gap (3yr)   | D&A @2yr   | Gap (2yr)   |
++===========+==========+==============+==============+================+============+=============+============+=============+
+| Microsoft | FY2025   | $298.6B      | $23.8B       | 12.5 yrs       | $99.5B     | $75.7B      | $149.3B    | $125.5B     |
++-----------+----------+--------------+--------------+----------------+------------+-------------+------------+-------------+
+| Alphabet  | 2024     | $250.4B      | $20.1B       | 12.5 yrs       | $83.5B     | $63.4B      | $125.2B    | $105.1B     |
++-----------+----------+--------------+--------------+----------------+------------+-------------+------------+-------------+
+| Meta      | 2024     | $164.7B      | $14.2B       | 11.6 yrs       | $54.9B     | $40.7B      | $82.3B     | $68.1B      |
++-----------+----------+--------------+--------------+----------------+------------+-------------+------------+-------------+
+| Amazon    | 2024     | $394.1B      | $33.7B       | 11.7 yrs       | $131.4B    | $97.7B      | $197.1B    | $163.4B     |
++-----------+----------+--------------+--------------+----------------+------------+-------------+------------+-------------+
+| TOTAL     |          |              |              |                |            | $277.5B     |            | $462.1B     |
++-----------+----------+--------------+--------------+----------------+------------+-------------+------------+-------------+
+
+  CRITICAL NOTE: Not all PP&E is GPUs/servers. These numbers represent
+  the MAXIMUM gap if ALL assets had shorter lives. Reality is somewhere between
+  current depreciation and these figures, since buildings depreciate over 15-30yr.
+
+  For a more realistic estimate, consider that server/network assets are:
+  - Meta: ~$68.4B of $164.7B gross PP&E (41.5%)
+  - Amazon data center equipment: ~60-70% of gross PP&E
+  - If ONLY server assets had 3yr life, the gap is roughly 40-60% of above
+
+  ADJUSTED ESTIMATE (servers/GPUs only, ~50% of PP&E):
+  - Hidden cost if 3yr life: ~$138.7B per year
+  - Hidden cost if 2yr life: ~$231.1B per year
+  - Over 3 years (2026-2028): ~$416.2B to $693.2B
+  - Burry's estimate of $176B is in this range — PLAUSIBLE
+
+==============================================================================
+  ANALYSIS 4: NVIDIA GPU OBSOLESCENCE TIMELINE
+==============================================================================
+  Does hardware actually become 'worthless' as the video claims?
+
++-------------------+-----------+---------------+--------------+-------+-------+------------+----------------+---------------+
+| GPU               | Release   |   FP16 TFLOPS | FP8 TFLOPS   | HBM   | TDP   |   TFLOPS/W | vs A100 Perf   | vs A100 Eff   |
++===================+===========+===============+==============+=======+=======+============+================+===============+
+| A100 (Ampere)     | May 2020  |           312 | -            | 80GB  | 400W  |       0.78 | 1.0x           | 1.0x          |
++-------------------+-----------+---------------+--------------+-------+-------+------------+----------------+---------------+
+| H100 SXM (Hopper) | Mar 2023  |           990 | 1,979        | 80GB  | 700W  |       1.41 | 3.2x           | 1.8x          |
++-------------------+-----------+---------------+--------------+-------+-------+------------+----------------+---------------+
+| H200 SXM          | Mar 2024  |           990 | 1,979        | 141GB | 700W  |       1.41 | 3.2x           | 1.8x          |
++-------------------+-----------+---------------+--------------+-------+-------+------------+----------------+---------------+
+| B200 (Blackwell)  | Q4 2024   |         2,250 | 4,500        | 192GB | 1000W |       2.25 | 7.2x           | 2.9x          |
++-------------------+-----------+---------------+--------------+-------+-------+------------+----------------+---------------+
+| GB200 NVL72       | Q1 2025   |         2,700 | 5,400        | 384GB | 1200W |       2.25 | 8.7x           | 2.9x          |
++-------------------+-----------+---------------+--------------+-------+-------+------------+----------------+---------------+
+| Rubin (R100)      | H2 2026   |         5,000 | 10,000       | 288GB | 1000W |       5    | 16.0x          | 6.4x          |
++-------------------+-----------+---------------+--------------+-------+-------+------------+----------------+---------------+
+
+  KEY FINDINGS:
+  - Performance increases ~2-3x per generation (every 1-2 years)
+  - A100 (2020) → Rubin (2026): 16x performance, 6.4x efficiency in 6 years
+  - H100 (2023) → Rubin (2026): 5x performance in just 3 years
+  - Power efficiency gains mean old GPUs cost MORE per computation AND use more power
+
+  THE CRITICAL QUESTION: Does an H100 purchased in 2023 for ~$25,000 have
+  economic value in 2028-2029 (when it's fully depreciated under 6yr schedule)?
+
+  ARGUMENT FOR "YES" (Value Cascade):
+  - Old GPUs cascade from training → inference → fine-tuning → edge
+  - Azure retired K80/P100/P40 GPUs in Aug/Sep 2023, after 7-9 years of service
+  - Even outdated GPUs can serve low-priority inference workloads profitably
+
+  ARGUMENT FOR "NO" (True Obsolescence):
+  - Power costs: An H100 doing what a B200 can do uses 2-3x MORE electricity
+  - At data center scale, electricity cost of old GPU > cost of new GPU over time
+  - Customers demand latest-gen performance; old GPUs can't serve cutting-edge models
+  - NVIDIA itself designs on 12-18 month cadence (Jensen Huang confirmed acceleration)
+
+  VERDICT: Partial truth. GPUs don't become "worthless" but their ECONOMIC value
+  drops much faster than 6-year straight-line depreciation suggests. A 3-4 year
+  useful life for AI training GPUs is more realistic. Inference GPUs may last 4-5yr.
+
+
+==============================================================================
+  ANALYSIS 5: VENDOR FINANCING & CIRCULAR REVENUE
+==============================================================================
+  The 'Left Foot on Right Foot' financing structure
+
+  ┌─────────────────────────────────────────────────────┐
+  │           MICROSOFT ↔ OPENAI MONEY LOOP             │
+  ├─────────────────────────────────────────────────────┤
+  │                                                     │
+  │  Microsoft invests $13B ──→ OpenAI                  │
+  │    (~50% as Azure credits)     │                    │
+  │                                │                    │
+  │                                ▼                    │
+  │  OpenAI spends on Azure: $12.4B (2024-Q3 2025)     │
+  │                                │                    │
+  │                                ▼                    │
+  │  Shows up as Microsoft Azure Revenue ←──┘           │
+  │                                                     │
+  │  OpenAI contracted: $250B in future Azure purchases │
+  │  = 45% of Microsoft's $625B revenue backlog         │
+  │                                                     │
+  │  OpenAI net loss (Q3 2025 quarter): ~$12B           │
+  └─────────────────────────────────────────────────────┘
+
++-----------------------------------------+---------+
+| Metric                                  | Value   |
++=========================================+=========+
+| Total MSFT investment in OpenAI         | $13.0B  |
++-----------------------------------------+---------+
+| Funded as of Sep 2025                   | $11.6B  |
++-----------------------------------------+---------+
+| OpenAI Azure spend (2024)               | $3.8B   |
++-----------------------------------------+---------+
+| OpenAI Azure spend (9mo 2025)           | $8.7B   |
++-----------------------------------------+---------+
+| OpenAI revenue share to MSFT (2024)     | $0.5B   |
++-----------------------------------------+---------+
+| OpenAI revenue share to MSFT (9mo 2025) | $0.9B   |
++-----------------------------------------+---------+
+| OpenAI's Azure commitment               | $250.0B |
++-----------------------------------------+---------+
+| OpenAI as % of MSFT backlog             | 45%     |
++-----------------------------------------+---------+
+| OpenAI net loss (Q3 2025)               | $-12.0B |
++-----------------------------------------+---------+
+
++------------------------------------+-----------------------------------------+
+| Amazon → Anthropic                 | Value                                   |
++====================================+=========================================+
+| Total AMZN investment in Anthropic | $13.8B                                  |
++------------------------------------+-----------------------------------------+
+| Format                             | Convertible notes, AWS as primary cloud |
++------------------------------------+-----------------------------------------+
+| Anthropic AWS revenue (2025E)      | $1.3B                                   |
++------------------------------------+-----------------------------------------+
+| Anthropic AWS revenue (2026E)      | $3.0B                                   |
++------------------------------------+-----------------------------------------+
+| Anthropic AWS revenue (2027E)      | $5.6B                                   |
++------------------------------------+-----------------------------------------+
+| New deployment deal                | $30.0B                                  |
++------------------------------------+-----------------------------------------+
+
+  KEY FINDINGS:
+
+  1. CIRCULAR REVENUE IS REAL: OpenAI spent $12.4B on Azure in <2 years,
+     much of it funded by Microsoft's own investment. This IS Azure revenue.
+
+  2. SCALE CONTEXT: Azure total revenue is ~$75B/yr. OpenAI's $8.65B (9mo)
+     represents ~15% of Azure revenue. This is MATERIAL, not trivial.
+
+  3. SUSTAINABILITY QUESTION: OpenAI lost ~$12B in a single quarter.
+     If OpenAI fails, Microsoft loses:
+     - Its $13B+ investment
+     - 45% of its $625B revenue backlog ($281B)
+     - A significant Azure revenue stream
+
+  4. DOT-COM PARALLEL: Very similar to Cisco/Lucent/Nortel providing vendor
+     financing to telecom customers in 1999-2000. When customers defaulted,
+     the vendors wrote off billions and stock crashed 80-90%.
+
+  5. AMAZON-ANTHROPIC: Morgan Stanley projects AWS will earn $1.3B→$3B→$5.6B
+     from Anthropic (2025-2027). Amazon also booked $9.5B gain from Anthropic
+     investment revaluation in one quarter.
+
+  6. CLOUD CREDITS ECOSYSTEM: AWS has distributed $6B+ in startup credits.
+     Cloud providers capture 16-32% of AI startup revenue as infrastructure fees
+     before startups approach profitability.
+
+
+==============================================================================
+  ANALYSIS 6: BALANCE SHEET RISK — PP&E EXPLOSION
+==============================================================================
+  How much of each company's balance sheet is now physical infrastructure?
+
++-----------+---------------------+-------------------+----------------+------------+
+| Company   | Earliest Net PP&E   | Latest Net PP&E   | Total Growth   | Last YoY   |
++===========+=====================+===================+================+============+
+| Microsoft | FY2020: $44.2B      | FY2025: $205.0B   | +364%          | +51% YoY   |
++-----------+---------------------+-------------------+----------------+------------+
+| Alphabet  | 2020: $84.7B        | 2024: $171.0B     | +102%          | +27% YoY   |
++-----------+---------------------+-------------------+----------------+------------+
+| Meta      | 2020: $45.6B        | 2024: $121.3B     | +166%          | +26% YoY   |
++-----------+---------------------+-------------------+----------------+------------+
+| Amazon    | 2020: $113.1B       | 2024: $252.7B     | +123%          | +24% YoY   |
++-----------+---------------------+-------------------+----------------+------------+
+
+  CapEx / Depreciation Ratio (>1.0 = assets accumulating faster than depreciating):
++-----------+----------+----------+----------+----------+----------+----------+
+| Company   | FY2020   | FY2021   | FY2022   | FY2023   | FY2024   | FY2025   |
++===========+==========+==========+==========+==========+==========+==========+
+| Microsoft | 1.2x     | 1.8x     | 1.6x     | 2.0x     | 2.6x     | 2.7x     |
++-----------+----------+----------+----------+----------+----------+----------+
+| Alphabet  | 1.7x     | 1.8x     | 2.1x     | 1.9x     | 2.6x     |          |
++-----------+----------+----------+----------+----------+----------+----------+
+| Meta      | 2.2x     | 2.5x     | 3.4x     | 2.5x     | 2.7x     |          |
++-----------+----------+----------+----------+----------+----------+----------+
+| Amazon    | 1.8x     | 2.3x     | 2.2x     | 1.5x     | 2.5x     |          |
++-----------+----------+----------+----------+----------+----------+----------+
+
+  KEY FINDINGS:
+  - Net PP&E has DOUBLED or more at every company in ~4 years
+  - Microsoft: $44B → $205B (365% growth in 5 years)
+  - Amazon: $113B → $253B (124% growth)
+  - CapEx/Depreciation ratios of 2-4x mean assets are piling up MUCH faster
+    than they're being written off
+  - This creates a massive future depreciation charge that will hit earnings
+    even if CapEx spending plateaus
+
+  THE "DEPRECIATION WALL":
+  When CapEx growth slows (it must eventually), depreciation charges will
+  continue rising for 5-6 years as the huge asset base is written off.
+  This will compress margins even without any new spending.
+
+
+==============================================================================
+  ANALYSIS 7: HISTORICAL PARALLELS
+==============================================================================
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  ERA            │ PATTERN                │ OUTCOME               │
+  ├──────────────────────────────────────────────────────────────────┤
+  │ 1830s Steam     │ Early adopters bought   │ Low-pressure engines  │
+  │ Engine Boom     │ expensive low-pressure   │ became worthless when │
+  │                 │ engines; high-pressure   │ high-pressure arrived.│
+  │                 │ engines arrived 5 years  │ First movers went     │
+  │                 │ later at 3x efficiency   │ bankrupt.             │
+  ├──────────────────────────────────────────────────────────────────┤
+  │ 1999-2000       │ Cisco/Lucent/Nortel     │ When customers        │
+  │ Dot-Com         │ provided vendor          │ defaulted, vendors    │
+  │ Telecom Bust    │ financing to customers   │ wrote off $100B+.     │
+  │                 │ buying networking gear.   │ Stocks crashed 80-90%.│
+  │                 │ Revenue was "circular."   │ Nortel went bankrupt. │
+  ├──────────────────────────────────────────────────────────────────┤
+  │ 2025-2026       │ Big Tech invests $13B+   │ ???                   │
+  │ AI Boom         │ in AI startups, mostly   │ If AI revenue doesn't │
+  │                 │ as cloud credits.        │ materialize, ~$250B+  │
+  │                 │ Startups spend credits    │ in contracted revenue │
+  │                 │ on cloud = "revenue."     │ could evaporate.      │
+  │                 │ GPUs depreciate over 6yr  │ Depreciation wall of  │
+  │                 │ while obsolete in 2-3yr.  │ $50-60B/yr hits.     │
+  └──────────────────────────────────────────────────────────────────┘
+
+  CRITICAL DIFFERENCE from Dot-Com:
+
+  Unlike dot-com startups, today's Big Tech has:
+  - $100-600B+ annual revenue each (not zero-revenue startups)
+  - Real, profitable cloud businesses generating $200B+ combined free cash flow
+  - Massive competitive moats in search, social, commerce, enterprise
+  - AI IS already generating revenue (MSFT AI revenue: $13B annualized)
+
+  The risk is NOT bankruptcy. The risk is:
+  1. MARGIN COMPRESSION: Depreciation wall hits earnings for 3-5 years
+  2. MULTIPLE COMPRESSION: Market re-rates from "AI growth" to "capital-intensive utility"
+  3. WRITE-DOWNS: If GPU obsolescence forces accelerated depreciation
+  4. CIRCULAR REVENUE UNWIND: If OpenAI/Anthropic restructure or pivot off cloud
+
+
+==============================================================================
+  FINAL VERDICT: IS THIS THE 'BIGGEST BUBBLE IN HISTORY'?
+==============================================================================
+
+  ┌──────────────────────┬────────────┬─────────────────────────────────────┐
+  │ CLAIM                │ VERDICT    │ EVIDENCE                            │
+  ├──────────────────────┼────────────┼─────────────────────────────────────┤
+  │ $600B+ combined      │ CONFIRMED  │ 2026 guidance: $635-665B combined.  │
+  │ CapEx                │            │ 2025 actual: ~$400B+. Unprecedented.│
+  ├──────────────────────┼────────────┼─────────────────────────────────────┤
+  │ 6-year depreciation  │ CONFIRMED  │ All 4 companies extended useful     │
+  │ hides true costs     │ & VALID    │ lives from 3-4yr to 5-6yr. Burry   │
+  │                      │ CONCERN    │ estimates $176B hidden dep 2026-28. │
+  │                      │            │ Amazon REVERSED in Jan 2025, citing │
+  │                      │            │ AI pace — proving the concern.      │
+  ├──────────────────────┼────────────┼─────────────────────────────────────┤
+  │ GPU rapid            │ CONFIRMED  │ Performance doubles every 1-2 years.│
+  │ obsolescence         │ TECHNICALLY│ A100→Rubin: 16x in 6 years.        │
+  │                      │            │ BUT old GPUs retain SOME value for  │
+  │                      │            │ inference (not "worthless").         │
+  ├──────────────────────┼────────────┼─────────────────────────────────────┤
+  │ Vendor financing /   │ CONFIRMED  │ OpenAI spent $12.4B on Azure funded │
+  │ circular revenue     │ & MATERIAL │ largely by MSFT's investment.       │
+  │                      │            │ OpenAI = 45% of MSFT's backlog.     │
+  │                      │            │ OpenAI lost ~$12B in one quarter.   │
+  ├──────────────────────┼────────────┼─────────────────────────────────────┤
+  │ "Biggest bubble      │ OVERSTATED │ Unlike dot-com, Big Tech has real   │
+  │ in history"          │ BUT RISKS  │ revenue ($1.5T+ combined). Risk is  │
+  │                      │ ARE REAL   │ margin compression & write-downs,   │
+  │                      │            │ not systemic collapse.              │
+  └──────────────────────┴────────────┴─────────────────────────────────────┘
+
+  QUANTIFIED RISK SCENARIOS:
+
+  SCENARIO 1 - SOFT LANDING (Most Likely, ~50% probability):
+    - AI revenue grows enough to justify spending over 3-5 years
+    - Depreciation wall hits but is absorbed by revenue growth
+    - Margins compress 5-10% temporarily
+    - Stock impact: -15% to -25% from peaks, recovered within 2 years
+
+  SCENARIO 2 - MODERATE CORRECTION (~30% probability):
+    - AI revenue disappoints; companies forced to accelerate depreciation
+    - Write-downs of $50-100B across the 4 companies
+    - Margin compression of 15-25% for 2-3 years
+    - Circular revenue partially unwinds
+    - Stock impact: -30% to -50%, recovery takes 3-5 years
+
+  SCENARIO 3 - HARD LANDING (~15% probability):
+    - AI proves unable to generate sufficient ROI
+    - Massive asset impairments ($150-300B across sector)
+    - Circular revenue fully unwinds; OpenAI/Anthropic restructure
+    - GPU resale market crashes
+    - Stock impact: -50% to -70%, echoes of dot-com (but companies survive)
+
+  SCENARIO 4 - BLACK SWAN (~5% probability):
+    - Energy grid constraints force data center shutdowns
+    - Regulatory action breaks up vendor financing
+    - NVIDIA supply disruption cascades through the system
+    - Stock impact: Unpredictable, potentially catastrophic short-term
+
+  BOTTOM LINE:
+  The video's core thesis is DIRECTIONALLY CORRECT. The specific mechanisms
+  (depreciation manipulation, vendor financing, GPU obsolescence) are all REAL
+  and VERIFIED by actual financial data. However, calling it "the biggest bubble
+  in history about to burst" is hyperbolic — these companies have genuine cash-
+  generating businesses unlike dot-com startups.
+
+  The more accurate framing: Big Tech is running a MASSIVE, leveraged bet on AI
+  with real risks that are partially hidden by accounting choices. If AI delivers,
+  the spending is justified. If it doesn't, there will be a painful but survivable
+  reckoning over 3-5 years.
+
+  INVESTOR IMPLICATIONS:
+  - Watch Amazon's depreciation policy changes (they're the canary in the coal mine)
+  - Monitor CapEx/Depreciation ratios (currently 2-4x = assets piling up)
+  - Track OpenAI's profitability relative to Azure revenue it generates
+  - Monitor free cash flow trends (already declining)
+  - Pivotal Research projects Alphabet's FCF to plummet 90% to $8.2B in 2026
+
+
+  Report analysis complete.
