@@ -222,21 +222,274 @@ def analyze_capex():
 
 
 # ============================================================
-# ANALYSIS 2: Depreciation & Implied Useful Life
+# ANALYSIS 2: Depreciation & Implied Useful Life (DETAILED)
 # ============================================================
-def analyze_depreciation():
-    print_section("ANALYSIS 2: DEPRECIATION POLICIES & IMPLIED USEFUL LIFE")
-    print("  Method: Gross PP&E / Annual Depreciation = Implied Average Useful Life")
-    print("  This reveals the ACTUAL depreciation period companies are using\n")
 
-    # Useful life policy changes
-    policy_rows = []
-    for co in ["Microsoft", "Alphabet", "Meta", "Amazon"]:
-        policy_rows.append([co, CAPEX_DATA[co]["useful_life_policy"]])
-    print(tabulate(policy_rows, headers=["Company", "Depreciation Policy Changes"],
+DEPRECIATION_DETAIL = {
+    "Microsoft": {
+        "original": "4 years",
+        "current": "6 years",
+        "change_date": "FY2023 (July 2022)",
+        "annual_savings": 3.7,  # $B
+        "rationale": "Software investments, operational efficiencies",
+        "ceo_quote": "Satya Nadella: 'I didn't want to go get stuck with 4 or 5 years of "
+                     "depreciation on one generation'",
+        "reversed": False,
+        "notes": "Depreciation rate as % of net PP&E fell from ~30-34% (FY2014-2020) to ~15% (FY2024). "
+                 "Q1 FY2026 D&A: $7.1B (up from $4.7B prior year). Computer equipment ~40-45% of gross PP&E.",
+    },
+    "Amazon/AWS": {
+        "original": "3 years",
+        "current": "6 years general; 5 years for AI GPUs (subset)",
+        "change_date": "Jan 2020: 3→4yr | 2022: 4→5yr | 2024: 5→6yr | Jan 2025: 6→5yr (AI subset)",
+        "annual_savings": 0.9,  # $B from 5→6yr change (2024)
+        "reversal_cost": 0.7,  # $700M full-year 2025 operating income hit
+        "accel_depr_q4_2024": 0.92,  # $920M accelerated depreciation for retired equipment
+        "rationale_for_reversal": "CFO Brian Olsavsky: 'increased pace of technology development, "
+                                   "particularly in the area of AI and ML'",
+        "reversed": True,
+        "notes": "ONLY hyperscaler to partially reverse course. AWS 2024 operating profit: $39.8B, "
+                 "so $700M hit = ~1.8%. Q1 2025: $217M more depreciation, Q2 2025: $280M more.",
+    },
+    "Google/Alphabet": {
+        "original": "3 years",
+        "current": "6 years",
+        "change_date": "2021: 3→4yr | Jan 2023: 4→6yr",
+        "annual_savings": 3.9,  # $B reduced depreciation in FY2023
+        "net_income_boost": 3.0,  # $B increased net income FY2023
+        "reversed": False,
+        "notes": "Google VP of AI infra claims 7-8yr old TPUs maintain '100% utilization'. "
+                 "BUT: Custom TPUs differ from commodity NVIDIA GPUs — TPUs are designed for "
+                 "Google's own workloads and may genuinely last longer within their ecosystem.",
+    },
+    "Meta": {
+        "original": "4 years",
+        "current": "5.5 years",
+        "change_date": "Q2 2022: 4→4.5yr | Late 2022: 4.5→5yr | Jan 2025: 5→5.5yr",
+        "annual_savings": 2.9,  # $B from latest extension (2025)
+        "savings_9mo_2025": 2.3,  # $B saved in first 9 months of 2025
+        "reversed": False,
+        "burry_overstatement_pct": 21.0,  # Burry estimate: profits overstated 21% by 2028
+        "notes": "Extended in Jan 2025 — same month Amazon SHORTENED. Under identical market "
+                 "conditions, took opposite direction. $2.9B = ~4% of estimated pre-tax profits.",
+    },
+    "CoreWeave": {
+        "original": "4 years",
+        "current": "6 years (72 months)",
+        "change_date": "2023: 4→5yr, then 5→6yr",
+        "reversed": False,
+        "notes": "~$13B in technology equipment. Competitor Nebius depreciates identical GPUs over "
+                 "4 years — 50% shorter. Jim Chanos publicly challenged this. Stock fell 61% from "
+                 "$187 to $72 (Jun-Dec 2025), erasing ~$33B market cap.",
+        "competitor_schedule": "Nebius: 4 years (same GPUs, same business model)",
+    },
+    "Oracle": {
+        "original": "4 years",
+        "current": "6 years",
+        "change_date": "2023: 4→5yr, then to 6yr",
+        "reversed": False,
+        "burry_overstatement_pct": 27.0,  # Worst among hyperscalers per Burry
+        "notes": "Burry estimates Oracle earnings overstated by ~27% by 2028 — worst among all "
+                 "hyperscalers. Cloud infra business is newer/smaller, so depreciation changes have "
+                 "outsized % impact on reported earnings.",
+    },
+}
+
+
+def analyze_depreciation():
+    print_section("ANALYSIS 2: DEPRECIATION POLICIES — COMPANY-BY-COMPANY DETAIL")
+    print("  Source: 10-K filings, earnings calls, Barclays/Princeton research\n")
+
+    # ── Summary Table ──
+    summary_rows = []
+    for co, d in DEPRECIATION_DETAIL.items():
+        summary_rows.append([
+            co,
+            d["original"],
+            d["current"],
+            d["change_date"].split("|")[0].strip() if "|" in d["change_date"] else d["change_date"],
+            f"+${d.get('annual_savings', 0):.1f}B" if d.get("annual_savings") else "N/A",
+            "YES ✦" if d["reversed"] else "No",
+        ])
+    # Add IRS/MACRS row
+    summary_rows.append([
+        "IRS MACRS (tax)", "—", "5 years", "Federal standard", "—", "—",
+    ])
+    print(tabulate(summary_rows,
+                   headers=["Company", "Original", "Current", "Key Change", "Annual Savings", "Reversed?"],
                    tablefmt="grid"))
 
-    print("\n  COMPUTED IMPLIED USEFUL LIFE (years):")
+    # ── Company-by-Company Deep Dive ──
+    print("""
+  ═══════════════════════════════════════════════════════════════
+  COMPANY-BY-COMPANY DEEP DIVE
+  ═══════════════════════════════════════════════════════════════""")
+
+    # MICROSOFT
+    print("""
+  ┌─────────────────────────────────────────────────────────────┐
+  │  MICROSOFT  —  4 years → 6 years (FY2023)                  │
+  ├─────────────────────────────────────────────────────────────┤
+  │  Change:   Extended server/network equipment from 4→6 years │
+  │  Date:     Effective beginning of FY2023 (July 2022)        │
+  │  Savings:  ~$3.7B in FY2023 ($1.1B in Q1 FY2023 alone)     │
+  │  D&A rate: Fell from ~30-34% of net PP&E (FY14-20) to ~15% │
+  │  Q1 FY26:  D&A = $7.1B (up from $4.7B prior year quarter)  │
+  │  PP&E:     Gross PP&E: $22B (FY13) → $298B (FY25)          │
+  │  Servers:  ~40-45% of gross PP&E is computer equipment      │
+  │                                                             │
+  │  CEO QUOTE (Satya Nadella):                                 │
+  │  "I didn't want to go get stuck with 4 or 5 years of       │
+  │   depreciation on one generation"                           │
+  │  — Implicitly ACKNOWLEDGES obsolescence may be faster       │
+  │    than the accounting schedule                             │
+  │                                                             │
+  │  RISK: If MSFT reverted to 4yr schedule, additional annual  │
+  │  depreciation would be ~$3.7B+ (much more now given         │
+  │  PP&E growth since 2022). Princeton CITP estimates true     │
+  │  annual GPU replacement cost is $13B vs reported $6.5B.     │
+  │                                                             │
+  │  STATUS: NO reversal announced as of Mar 2026.              │
+  └─────────────────────────────────────────────────────────────┘""")
+
+    # AMAZON
+    print("""
+  ┌─────────────────────────────────────────────────────────────┐
+  │  AMAZON/AWS  —  3 years → 6 years → 5 years (AI subset)    │
+  ├─────────────────────────────────────────────────────────────┤
+  │  Timeline of ALL changes:                                   │
+  │    Q4 2019 (eff. Jan 2020):  3yr → 4yr for servers          │
+  │    Early 2022:               4yr → 5yr; networking 5→6yr    │
+  │    2024:                     5yr → 6yr (+$900M to Q1 profit)│
+  │    Jan 2025:                 6yr → 5yr (AI GPUs & switches) │
+  │                                                             │
+  │  THE PARTIAL REVERSAL (Jan 2025):                           │
+  │    - Shortened AI training GPUs & high-power networking     │
+  │      switches from 6yr back to 5yr                          │
+  │    - Cost: $700M reduction in 2025 operating income         │
+  │    - Also took $920M accelerated depreciation in Q4 2024    │
+  │      for early-retired equipment                            │
+  │    - Q1 2025 impact: +$217M depreciation, -$162M net income │
+  │    - Q2 2025 impact: +$280M depreciation, -$217M net income │
+  │                                                             │
+  │  CFO RATIONALE: "increased pace of technology development,  │
+  │  particularly in the area of artificial intelligence and    │
+  │  machine learning"                                          │
+  │                                                             │
+  │  SIGNIFICANCE: Amazon is THE CANARY IN THE COAL MINE.       │
+  │  Only hyperscaler to partially reverse. If others follow,   │
+  │  expect billions in earnings hits across the sector.        │
+  │  AWS 2024 op. profit: $39.8B → $700M hit = ~1.8% of profit │
+  │                                                             │
+  │  STATUS: PARTIALLY REVERSED. Most conservative among peers. │
+  └─────────────────────────────────────────────────────────────┘""")
+
+    # GOOGLE
+    print("""
+  ┌─────────────────────────────────────────────────────────────┐
+  │  GOOGLE/ALPHABET  —  3 years → 6 years (Jan 2023)          │
+  ├─────────────────────────────────────────────────────────────┤
+  │  Timeline:                                                  │
+  │    2021:     3yr → 4yr for servers; networking 4→5yr        │
+  │    Jan 2023: 4yr → 6yr for servers; some networking to 6yr  │
+  │                                                             │
+  │  Financial impact (FY2023):                                 │
+  │    - Reduced depreciation by $3.9B                          │
+  │    - Increased net income by $3.0B                          │
+  │    - ~$983M/quarter reduction in depreciation expense       │
+  │                                                             │
+  │  DEFENSE: Google VP of AI Infra claims 7-8yr old TPUs       │
+  │  maintain "100% utilization"                                │
+  │                                                             │
+  │  IMPORTANT NUANCE: Google's custom TPUs differ from         │
+  │  commodity NVIDIA GPUs. TPUs are designed specifically for   │
+  │  Google's workloads and may genuinely have longer useful     │
+  │  lives within Google's ecosystem. Merchant GPU silicon       │
+  │  faces market-driven obsolescence that TPUs do not.          │
+  │                                                             │
+  │  2025 CapEx guidance: >$90B (overwhelmingly AI infra)       │
+  │                                                             │
+  │  STATUS: NO reversal announced as of Mar 2026.              │
+  └─────────────────────────────────────────────────────────────┘""")
+
+    # META
+    print("""
+  ┌─────────────────────────────────────────────────────────────┐
+  │  META  —  4 years → 5.5 years (Jan 2025)                   │
+  ├─────────────────────────────────────────────────────────────┤
+  │  Timeline (FOUR separate extensions):                       │
+  │    Pre-2022:   4yr for servers and network devices          │
+  │    Q2 2022:    4yr → 4.5yr                                  │
+  │    Late 2022:  4.5yr → 5yr (+$1.5B to bottom line)          │
+  │    Jan 2025:   5yr → 5.5yr                                  │
+  │                                                             │
+  │  Financial impact of Jan 2025 change:                       │
+  │    - Expected $2.9B savings in 2025 (~4% of pre-tax profit) │
+  │    - Saved $2.3B in first 9 months of 2025 alone            │
+  │                                                             │
+  │  THE CONTRADICTION: Meta extended useful life in Jan 2025   │
+  │  — the EXACT SAME MONTH Amazon shortened it. Under          │
+  │  identical market conditions, facing the same GPU tech       │
+  │  cycle, they reached OPPOSITE conclusions. This proves      │
+  │  useful life is a SUBJECTIVE management judgment call.       │
+  │                                                             │
+  │  BURRY ESTIMATE: Meta's profits overstated by ~21% by 2028 │
+  │                                                             │
+  │  STATUS: NO reversal. Continuing to extend.                 │
+  └─────────────────────────────────────────────────────────────┘""")
+
+    # COREWEAVE
+    print("""
+  ┌─────────────────────────────────────────────────────────────┐
+  │  COREWEAVE  —  4 years → 6 years (2023)                    │
+  ├─────────────────────────────────────────────────────────────┤
+  │  Timeline:                                                  │
+  │    Pre-2023:   4yr for technology equipment                 │
+  │    2023:       4yr → 5yr, then 5yr → 6yr (72 months)       │
+  │                                                             │
+  │  S-1 disclosure: 6yr straight-line for all computing,       │
+  │  networking, and storage components (including NVIDIA GPUs) │
+  │                                                             │
+  │  Asset base: ~$13B in technology equipment (mid-2025)       │
+  │                                                             │
+  │  CRITICAL COMPARATOR:                                       │
+  │    Nebius (identical business model — GPU cloud) depreciates│
+  │    the SAME GPUs over 4 YEARS. That's 50% shorter.          │
+  │                                                             │
+  │  SCRUTINY:                                                  │
+  │    - Jim Chanos publicly challenged CoreWeave's accounting  │
+  │    - Stock fell 61%: $187 → $72 (Jun-Dec 2025)             │
+  │    - ~$33B in market cap erased                             │
+  │    - Debt: $18.8B COLLATERALIZED BY NVIDIA GPUs              │
+  │                                                             │
+  │  DEFENSE: CEO claims A100s "fully booked", H100 contracts   │
+  │  re-booked at 95% of original price.                        │
+  │                                                             │
+  │  STATUS: NO reversal. Under significant investor scrutiny.  │
+  └─────────────────────────────────────────────────────────────┘""")
+
+    # ORACLE
+    print("""
+  ┌─────────────────────────────────────────────────────────────┐
+  │  ORACLE  —  4 years → 6 years (2023)                       │
+  ├─────────────────────────────────────────────────────────────┤
+  │  Timeline: 4yr → 5yr (2023), then to 6yr                   │
+  │                                                             │
+  │  BURRY ESTIMATE: Earnings overstated by ~27% by 2028       │
+  │  — WORST among all hyperscalers                             │
+  │                                                             │
+  │  WHY WORST: Oracle's cloud infra business is newer and      │
+  │  smaller than peers, so depreciation changes have an        │
+  │  outsized percentage impact on reported earnings.           │
+  │                                                             │
+  │  Analyst view: "aggressive even under optimistic cascade    │
+  │  assumptions"                                               │
+  │                                                             │
+  │  STATUS: NO reversal.                                       │
+  └─────────────────────────────────────────────────────────────┘""")
+
+    # ── Computed Implied Useful Life ──
+    print("\n  COMPUTED IMPLIED USEFUL LIFE (Gross PP&E / Annual D&A):")
     life_rows = []
     for co in ["Microsoft", "Alphabet", "Meta", "Amazon"]:
         row = [co]
@@ -247,26 +500,80 @@ def analyze_depreciation():
                 life = gross[year] / depr[year]
                 row.append(f"{life:.1f}")
         life_rows.append(row)
-
-    # Use Microsoft's years as reference
     msft_years = sorted(CAPEX_DATA["Microsoft"]["gross_ppe"].keys())
     print(tabulate(life_rows, headers=["Company"] + msft_years, tablefmt="grid"))
+    print("  Note: >6yr implies D&A is lagging the PP&E buildup (depreciation 'wall' forming)")
 
-    print("\n  KEY FINDINGS:")
-    print("  - All 4 companies show implied useful lives of 5-8+ years")
-    print("  - Microsoft: Implied life grew from 6.8 to 12.5 years (gross PP&E growing")
-    print("    faster than depreciation catches up)")
-    print("  - Amazon REVERSED its policy in Jan 2025 (6yr→5yr), citing 'increased pace")
-    print("    of technology development, particularly in AI/ML'")
-    print("  - Meta went OPPOSITE direction in Feb 2025 (5yr→5.5yr), saving $2.9B")
-    print("  - This divergence under identical conditions proves useful life is SUBJECTIVE")
+    # ── Aggregate Industry Impact ──
+    print("""
+  ═══════════════════════════════════════════════════════════════
+  AGGREGATE INDUSTRY IMPACT
+  ═══════════════════════════════════════════════════════════════
 
-    # Michael Burry's analysis
-    print("\n  MICHAEL BURRY'S ANALYSIS (Nov 2025):")
-    print("  - Called depreciation extension 'one of the more common frauds of the modern era'")
-    print("  - Estimated $176B in understated depreciation from 2026-2028")
-    print("  - Oracle profits overstated by ~27%, Meta by ~21% if realistic 2-3yr life used")
-    print("  - Took put options: $187M notional against NVDA, $912M against PLTR")
+  COLLECTIVE DEPRECIATION REDUCTION:
+  Hyperscalers collectively reduced reported depreciation from an estimated
+  ~$39B to ~$21B through useful life extensions — a 46% REDUCTION in
+  reported depreciation expense. (Source: Barclays, Deep Quarry analysis)
+
+  TWO EMERGING ACCOUNTING CULTURES:
+  ┌──────────────────────────────────────────────────────────────┐
+  │  "ADMITS COST EARLY" (Conservative)                          │
+  │  - Amazon: Reversed to 5yr for AI GPUs, took $920M hit      │
+  │  - Nebius: 4yr schedule (50% shorter than peers)             │
+  ├──────────────────────────────────────────────────────────────┤
+  │  "EXTENDS TO SMOOTH" (Aggressive)                            │
+  │  - Microsoft: 6yr, no reversal, $3.7B annual savings         │
+  │  - Google: 6yr, no reversal, $3.9B savings in FY2023         │
+  │  - Meta: 5.5yr, STILL extending, $2.9B savings               │
+  │  - CoreWeave: 6yr, under Chanos scrutiny, stock -61%         │
+  │  - Oracle: 6yr, worst overstatement per Burry (27%)           │
+  └──────────────────────────────────────────────────────────────┘
+
+  BARCLAYS WARNING (Ross Sandler, July 2024):
+  - Wall Street consensus estimates UNDERCOUNT AI depreciation by 5-10% of EPS
+  - Most models estimate depreciation as standard % of revenue
+  - But AI CapEx is growing FAR faster than revenue, breaking the formula
+  - Once hardware purchased under extended schedules reaches end-of-life
+    (starting 2025 for Meta's oldest extended-life servers), the benefit
+    disappears and depreciation catches up
+
+  MICHAEL BURRY'S ANALYSIS (Nov 2025):
+  - Called depreciation extension 'one of the more common frauds of the modern era'
+  - Estimated $176B in understated depreciation from 2026-2028
+  - Oracle profits overstated by ~27%, Meta by ~21% if 2-3yr life used
+  - Took put options: $187M notional against NVDA, $912M against PLTR
+  - His framing: "NVIDIA is Cisco, not Enron" — not alleging fraud at NVIDIA,
+    but arguing it's at the center of a capital cycle that may overshoot
+  - NVIDIA sent a 7-page note to Wall Street analysts naming Burry directly
+    (unusually aggressive corporate response to a short seller)
+
+  PRINCETON CITP (Oct/Dec 2025):
+  - "Actual useful life is at least half the accounting life"
+  - MSFT example: ~$80B annual AI infra spend → if half is compute with
+    3yr true life → $13B/yr replacement cost vs reported $6.5B/yr D&A
+  - The $6.5B/yr gap = a temporary subsidy that inflates profits AND
+    funds competitive positioning before accounting reality catches up
+  - Bain estimate: AI firms face $800B ANNUAL revenue hole by 2030
+
+  IRS MACRS STANDARD: 5 years (200% declining balance)
+  - The IRS itself says computer equipment depreciates in 5 years
+  - Most hyperscalers use 5.5-6 years — LONGER than the IRS assumes
+  - Section 179 and bonus depreciation allow FULL expensing for tax
+
+  SEC REGULATORY STATUS:
+  - Dec 2025: SEC Investor Advisory Committee voted to recommend
+    guidance requiring AI-related disclosures (incl. depreciation)
+  - No formal enforcement action taken as of Mar 2026
+  - Under current GAAP (ASC 360), useful life is management judgment
+  - Companies have wide latitude as long as assumptions are disclosed
+
+  PROPOSED REFORM: Component-based depreciation
+  - GPU modules: 3.5-4.5yr life, 30-35% salvage value
+  - Chassis/networking/power/cooling: 6-8yr life, lower salvage
+  - This would more accurately reflect that GPUs (the most expensive
+    component) obsolete faster than surrounding infrastructure""")
+
+    return
 
 
 # ============================================================
@@ -623,6 +930,154 @@ def analyze_historical_parallels():
 
 
 # ============================================================
+# ANALYSIS 8: Real Risks vs. Overstated Risks
+# ============================================================
+def analyze_risks():
+    print_section("ANALYSIS 8: REAL RISKS vs. OVERSTATED RISKS")
+    print("  A balanced assessment: what to worry about and what is overblown\n")
+
+    print("""
+  ═══════════════════════════════════════════════════════════════
+  PART A: REAL RISKS (supported by data)
+  ═══════════════════════════════════════════════════════════════
+
+  1. DEPRECIATION MISMATCH (HIGH severity, HIGH likelihood)
+  ─────────────────────────────────────────────────────────
+  - Burry: $176B understated depreciation 2026-2028
+  - Oracle earnings overstated ~27%, Meta ~21% by 2028
+  - MSFT depreciation rate fell from 30-34% of PP&E to just 15%
+  - Industry collectively reduced reported D&A from ~$39B to ~$21B (46% cut)
+  - Amazon's reversal (6yr→5yr) validates the concern
+  - ASU 2024-03 (eff. late 2025) will force disaggregated D&A disclosure
+
+  2. CASH FLOW vs EARNINGS DIVERGENCE (HIGH, NEAR-CERTAIN)
+  ─────────────────────────────────────────────────────────
+  - Meta FCF: $54B (2024) → $20B (2025) — 63% DROP while earnings hold
+  - Alphabet: trades at ~30x P/E but implied ~52x on FCF basis
+  - CapEx now 45-57% of revenue (utility-level ratios)
+  - After buybacks + dividends, CapEx EXCEEDS cash flows (debt needed)
+  - Annual D&A could climb from $150B → $400B over next 5 years
+
+  3. THE CAPEX TRAP (HIGH, HIGH — already in motion)
+  ─────────────────────────────────────────────────────────
+  - $660-690B committed for 2026 (Goldman: $1.15T cumulative 2025-2027)
+  - AI services generated only ~$25B revenue in 2025 (10:1 spend ratio)
+  - Only 25% of AI initiatives delivered expected ROI
+  - MIT: 95% of AI pilot projects fail to yield meaningful results
+  - Prisoner's dilemma: no one can stop spending without losing the AI war
+
+  4. STRANDED ASSET RISK (MEDIUM-HIGH, MEDIUM)
+  ─────────────────────────────────────────────────────────
+  - Triggered when operating cost of old GPU > revenue it generates
+  - CoreWeave: 62% revenue from Microsoft (extreme concentration)
+  - GPU-backed debt ($18.8B at CoreWeave) has collateral risk
+  - Best parallel: telecom fiber — 85-95% remained dark 4yrs after bust
+  - Creditors assume 7-15yr asset life; economic depreciation is 30-40%/yr
+
+  5. NVIDIA CUSTOMER CONCENTRATION (MEDIUM, MEDIUM)
+  ─────────────────────────────────────────────────────────
+  - 4 customers = 61% of NVIDIA revenue (late 2025)
+  - All 4 building custom chips: Google TPU v6, Amazon Trainium,
+    Microsoft Maia, Meta MTIA
+  - If one shifts 30-50% of workloads: $15-25B annual revenue impact
+  - CUDA ecosystem provides moat but not impenetrable one
+
+  ═══════════════════════════════════════════════════════════════
+  PART B: OVERSTATED / MISUNDERSTOOD RISKS
+  ═══════════════════════════════════════════════════════════════
+
+  1. "GPUs BECOME WORTHLESS OVERNIGHT" — OVERSTATED
+  ─────────────────────────────────────────────────────────
+  WHY IT'S WRONG:
+  - A100s (launched 2020) STILL virtually impossible to find in 2026
+  - ~$20B+ quarterly NVIDIA revenue still from Ampere/Hopper (prior gen)
+  - Azure ran K80/P100/P40 GPUs for 7-9 years before retirement
+  - Secondary market holds 50-85% of original pricing
+  - Value Cascade model: Training → Inference → Batch over GPU lifetime
+  - A100s more compatible with existing 10-15kW/rack infrastructure
+
+  WHAT'S TRUE: Economic value drops faster than 6yr straight-line assumes.
+  Realistic useful life: 3-4yr for training, 4-6yr with cascade to inference.
+
+  2. "IT'S EXACTLY LIKE DOT-COM" — OVERSTATED
+  ─────────────────────────────────────────────────────────
+  WHY IT'S WRONG:
+  - NVIDIA: 53.4% net margin (dot-com companies had zero revenue)
+  - MSFT/GOOG/META: decades old, hundreds of billions in revenue
+  - CapEx funded by reinvested profits, not speculative VC
+  - S&P 500 at ~28x P/E vs 60-100x in 2000
+  - Fed Chair Powell: "These companies actually have earnings"
+
+  WHAT'S TRUE: The INFRASTRUCTURE OVERINVESTMENT parallel is valid.
+  Telecom built 80M miles of fiber; 85-95% stayed dark for years.
+  The demand arrived eventually — but on a longer timeline than assumed.
+  Circular revenue patterns mirror Lucent/Nortel vendor financing.
+
+  3. "DEPRECIATION EXTENSION IS FRAUD" — OVERSTATED
+  ─────────────────────────────────────────────────────────
+  WHY IT'S WRONG:
+  - Legitimate under GAAP (ASC 360-10-35-4): "allocation, not valuation"
+  - Change in estimate under ASC 250-10, accounted for prospectively
+  - All Big 4 auditors signed off
+  - Amazon's shortening proves the system works (self-correcting)
+  - There IS evidence for longer lives (Azure K80s ran 9 years)
+
+  WHAT'S TRUE: The one-directional pattern is suspicious.
+  Meta: 3 → 4 → 4.5 → 5 → 5.5yr — always toward higher earnings.
+  $176B aggregate impact IS material enough for skepticism.
+  Policies originally set for CPU fleets applied wholesale to GPUs.
+  New rule ASU 2024-03 will force more transparency.
+
+  4. "ALL CAPEX IS WASTED" — OVERSTATED
+  ─────────────────────────────────────────────────────────
+  WHY IT'S WRONG:
+  - Coding assistants: $4B spend, 62% of teams report 25%+ productivity
+  - Customer service AI: $3.50 return per $1 invested
+  - 74% of executives report ROI within first year
+  - GitHub: AI could add $1.5T to global GDP
+  - 52% of executives have AI agents in production
+
+  WHAT'S TRUE: Only 25% of initiatives deliver expected ROI.
+  MIT: 95% of pilot projects fail. 49% cite inference cost as barrier.
+  Broad enterprise transformation remains early-stage and uncertain.
+
+  5. "POWER COSTS MAKE OLD GPUs USELESS" — OVERSTATED
+  ─────────────────────────────────────────────────────────
+  WHY IT'S WRONG:
+  - Older GPUs actually draw LESS total power:
+    A100: 400W | H100: 700W | B200: 1,000-1,200W | Rubin: ~1,800W
+  - 1MW supports ~2,500 A100s vs ~1,000 B200s
+  - Power-constrained facilities benefit from lower-wattage GPUs
+  - Inference workloads are memory-bound; actual draw << TDP
+
+  WHAT'S TRUE: Performance-per-watt favors newer GPUs 2-5x.
+  B200 uses 0.53 J/token vs H100's 2.46 J/token (4.6x better).
+  For hyperscale inference, the per-token economics WILL kill old GPUs.
+  But for many workloads, total cost of ownership favors older hardware.
+
+  ═══════════════════════════════════════════════════════════════
+  RISK MATRIX SUMMARY
+  ═══════════════════════════════════════════════════════════════
+
+  ┌────────────────────────────┬──────────┬────────────┬───────────┐
+  │ Risk                       │ Severity │ Likelihood │ Timeframe │
+  ├────────────────────────────┼──────────┼────────────┼───────────┤
+  │ Depreciation mismatch      │ HIGH     │ HIGH       │ 2026-2028 │
+  │ Cash flow vs earnings gap  │ HIGH     │ CERTAIN    │ NOW       │
+  │ CapEx trap / overinvestment│ HIGH     │ HIGH       │ Now-2028  │
+  │ Stranded assets            │ MED-HIGH │ MEDIUM     │ 2027-2030 │
+  │ NVIDIA concentration       │ MEDIUM   │ MEDIUM     │ 2026-2028 │
+  ├────────────────────────────┼──────────┼────────────┼───────────┤
+  │ "GPUs worthless overnight" │ OVERSTATED                        │
+  │ "Exactly like dot-com"     │ OVERSTATED (infra parallel valid) │
+  │ "Depreciation is fraud"    │ OVERSTATED (but pattern suspect)  │
+  │ "All CapEx is wasted"      │ OVERSTATED (but ROI uncertain)    │
+  │ "Power kills old GPUs"     │ OVERSTATED (nuanced truth)        │
+  └────────────────────────────┴───────────────────────────────────┘
+""")
+
+
+# ============================================================
 # FINAL VERDICT
 # ============================================================
 def final_verdict():
@@ -724,6 +1179,7 @@ def main():
     analyze_vendor_financing()
     analyze_balance_sheet_risk()
     analyze_historical_parallels()
+    analyze_risks()
     final_verdict()
 
     # Save report
