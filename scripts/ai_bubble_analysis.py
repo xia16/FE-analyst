@@ -383,6 +383,28 @@ def analyze_gpu_obsolescence():
   - Customers demand latest-gen performance; old GPUs can't serve cutting-edge models
   - NVIDIA itself designs on 12-18 month cadence (Jensen Huang confirmed acceleration)
 
+  REAL-WORLD BENCHMARK vs MARKETING (important nuance):
+  - NVIDIA marketing claims 15-30x gains (using FP4 + sparsity best-case)
+  - Real-world: B200 is ~57% faster than H100 for training, ~10% for inference
+  - The gap between marketing and reality is significant
+
+  SECONDARY MARKET DATA:
+  - H100 rental rates: dropped ~70% from peak ($8+/hr → $2.50/hr)
+  - A100 80GB resale: $12K-$18K (from $25K+ new) — ~50% value in 2 years
+  - CoreWeave: H100s rebooked at 95% of original rental pricing
+  - CoreWeave: A100s from 2020 still "fully booked"
+  - HPE exec (GTC 2025): Enterprise customers only NOW adopting H100s
+
+  PRINCETON CITP ANALYSIS (critical):
+  - NVIDIA data center revenue: $115B+/year
+  - Downstream secondary market buyers: tiny fraction of that
+  - When hyperscalers upgrade en masse, secondary market CANNOT absorb supply
+  - This is when residual values could collapse
+
+  GROQ CEO (Jonathan Ross): AI accelerators should depreciate on 1-2yr schedules
+  PRINCETON (Mihir Kshirsagar): If MSFT's true GPU life is 3yr not 6yr,
+    actual replacement costs are ~$13B/yr vs reported ~$6.5B/yr
+
   VERDICT: Partial truth. GPUs don't become "worthless" but their ECONOMIC value
   drops much faster than 6-year straight-line depreciation suggests. A 3-4 year
   useful life for AI training GPUs is more realistic. Inference GPUs may last 4-5yr.
