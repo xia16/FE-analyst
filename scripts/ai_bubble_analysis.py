@@ -130,6 +130,14 @@ VENDOR_FINANCING = {
         "annual_rate": 1.0,
         "per_yc_startup": 0.5,  # $500K each
     },
+    "NVIDIA Circular Investments": {
+        "openai_commitment": 100.0,  # $100B, 10 tranches of $10B
+        "coreweave_investment": 2.0,
+        "coreweave_gpu_purchases": 7.5,  # 250K+ GPUs
+        "coreweave_debt": 18.81,  # collateralized by GPUs
+        "startup_investments_2024": 1.0,  # $1B+ across 50+ startups
+        "note": "NewStreet: every $10B NVDA invests yields $35B in GPU purchases",
+    },
 }
 
 
@@ -462,6 +470,25 @@ def analyze_vendor_financing():
   6. CLOUD CREDITS ECOSYSTEM: AWS has distributed $6B+ in startup credits.
      Cloud providers capture 16-32% of AI startup revenue as infrastructure fees
      before startups approach profitability.
+
+  7. NVIDIA'S OWN CIRCULAR FINANCING (most alarming finding):
+     - NVIDIA committed $100B to OpenAI (Sep 2025) — 10 tranches of $10B
+     - Invested $2B in CoreWeave, which bought 250K+ NVIDIA GPUs ($7.5B)
+     - CoreWeave carries $18.8B debt COLLATERALIZED BY NVIDIA GPUS
+     - NewStreet Research: every $10B NVIDIA invests yields $35B in GPU purchases
+     - This is vendor financing at a scale that DWARFS the dot-com era
+
+  8. ANTHROPIC ECONOMICS: Spent $2.66B on AWS (thru Sep 2025) against $2.55B
+     in revenue — meaning >100% of revenue goes to AWS compute costs.
+
+  9. NBER STUDY (Feb 2026): 90% of firms report NO measurable impact of
+     AI on workplace productivity, yet executives project 1.4% gains.
+     This expectation-reality gap is exactly what precedes corrections.
+
+  10. CUSTOM CHIP RISK: MSFT (Maia), GOOG (TPU), AMZN (Trainium), META (MTIA)
+      all building own chips. If successful, this undercuts the entire
+      GPU-collateralized financing ecosystem — CoreWeave's $18.8B in
+      GPU-backed debt becomes especially vulnerable.
 """)
 
 
@@ -543,19 +570,18 @@ def analyze_historical_parallels():
   │                 │ engines arrived 5 years  │ First movers went     │
   │                 │ later at 3x efficiency   │ bankrupt.             │
   ├──────────────────────────────────────────────────────────────────┤
-  │ 1999-2000       │ Cisco/Lucent/Nortel     │ When customers        │
-  │ Dot-Com         │ provided vendor          │ defaulted, vendors    │
-  │ Telecom Bust    │ financing to customers   │ wrote off $100B+.     │
-  │                 │ buying networking gear.   │ Stocks crashed 80-90%.│
-  │                 │ Revenue was "circular."   │ Nortel went bankrupt. │
+  │ 1999-2000       │ Lucent: $8.1B vendor     │ 47 CLECs went bankrupt│
+  │ Dot-Com         │ financing. Nortel: $7B+. │ 33-80% of loans lost. │
+  │ Telecom Bust    │ Cisco: $2.4B. Revenue    │ Lucent rev -69%.      │
+  │                 │ booked from own loans.   │ Nortel: $86→$0.18.    │
+  │                 │ Total: ~$17.5B circular  │ Cisco stock fell ~90%.│
   ├──────────────────────────────────────────────────────────────────┤
-  │ 2025-2026       │ Big Tech invests $13B+   │ ???                   │
-  │ AI Boom         │ in AI startups, mostly   │ If AI revenue doesn't │
-  │                 │ as cloud credits.        │ materialize, ~$250B+  │
-  │                 │ Startups spend credits    │ in contracted revenue │
-  │                 │ on cloud = "revenue."     │ could evaporate.      │
-  │                 │ GPUs depreciate over 6yr  │ Depreciation wall of  │
-  │                 │ while obsolete in 2-3yr.  │ $50-60B/yr hits.     │
+  │ 2025-2026       │ MSFT→OpenAI: $13B.       │ ???                   │
+  │ AI Boom         │ AMZN→Anthropic: $13.8B.  │ NVIDIA circular: every│
+  │                 │ NVDA→OpenAI: $100B.      │ $10B invested yields  │
+  │                 │ NVDA→CoreWeave: $2B.     │ $35B in GPU purchases.│
+  │                 │ Total circular: $130B+   │ CoreWeave: $18.8B debt│
+  │                 │ (vs $17.5B in dot-com)   │ backed by GPUs.       │
   └──────────────────────────────────────────────────────────────────┘
 
   CRITICAL DIFFERENCE from Dot-Com:
