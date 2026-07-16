@@ -1,0 +1,44 @@
+# Keep the Cloud Build upload small — exclude heavy/secret/unneeded paths.
+# NOTE: do not exclude anything the Dockerfile COPYs (configs/, src/,
+# reports/output/, dashboard/frontend source, dashboard/api/*.py).
+
+# Virtual environments
+venv/
+.venv/
+dashboard/api/venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Node modules (npm ci regenerates from package-lock in the build)
+dashboard/frontend/node_modules/
+dashboard/frontend/dist/
+
+# Local data caches (not needed in image)
+data/cache/
+data/raw/
+data/processed/
+
+# Local SQLite DBs (seeded/managed in-container or via GCS)
+dashboard/api/*.db
+
+# Git & tooling
+.git/
+.claude/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — never upload
+.env
+.env.*
+
+# Extras not needed for the container
+notebooks/
+models/
+reports/output/_archive/
+reports/output/transcripts/

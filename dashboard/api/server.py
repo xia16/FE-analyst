@@ -37,6 +37,7 @@ from telegram_bot import (
 )
 import db_persistence
 import stock_index
+import macro_monitor
 
 logger = logging.getLogger("server")
 
@@ -684,8 +685,47 @@ def check_buy_opportunities():
 # ---------------------------------------------------------------------------
 # Scheduler — runs buy opportunity scan daily at 09:00 UTC
 # ---------------------------------------------------------------------------
-scheduler = BackgroundScheduler()
-scheduler.add_job(check_buy_opportunities, "cron", hour=9, minute=0)
+def refresh_macro_monitor():
+    """Daily bubble-monitor refresh — persists snapshot, emails a full daily digest."""
+    try:
+        snap = macro_monitor.refresh_and_store(send_email=True, digest=True)
+        logger.info(
+            "Macro monitor refreshed: %s (%d new trips)",
+            snap["overall_status"], len(snap.get("triggered", [])),
+        )
+    except Exception as e:
+        logger.error("Macro monitor refresh failed: %s", e)
+
+
+def check_quarterly_updates():
+    """Earnings-window checker — catches new cloud-capex quarters as they file.
+
+    Runs through the hyperscaler reporting months (config: earnings_calendar).
+    refresh_and_store() emails automatically when a new quarter is detected.
+    """
+    try:
+        snap = macro_monitor.refresh_and_store(send_email=True)
+        if snap.get("capex_updated"):
+            logger.info("Quarterly checker: new capex quarter emailed")
+    except Exception as e:
+        logger.error("Quarterly checker failed: %s", e)
+
+
+# NOTE: this in-process scheduler only fires while the server is running. For
+# reliable daily email even when the dashboard is down, also schedule the
+# standalone dashboard/api/send_daily_digest.py via OS cron / launchd (see file).
+scheduler = BackgroundScheduler(timezone="UTC")
+# misfire_grace_time lets a slightly-late run (server busy at the exact minute)
+# still fire instead of being silently skipped.
+scheduler.add_job(check_buy_opportunities, "cron", hour=9, minute=0, misfire_grace_time=3600)
+scheduler.add_job(refresh_macro_monitor, "cron", hour=10, minute=0, misfire_grace_time=3600)
+# Earnings-window checker for new quarterly capex reports (timed to filing season).
+_bm_cfg = load_yaml(PROJECT_ROOT / "configs" / "bubble_monitor.yaml").get("earnings_calendar", {})
+scheduler.add_job(
+    check_quarterly_updates, "cron",
+    month=_bm_cfg.get("check_cron_months", "1,2,4,5,7,8,10,11"),
+    hour=_bm_cfg.get("check_cron_hour", 11), minute=30, misfire_grace_time=3600,
+)
 stock_index.schedule_refresh(scheduler)
 scheduler.start()
 
@@ -969,6 +1009,34 @@ def trigger_scan():
     """Manually trigger a buy-opportunity scan across all domains."""
     new_alerts = check_buy_opportunities()
     return {"newAlerts": len(new_alerts), "totalAlerts": len(alerts_store), "alerts": new_alerts}
+
+
+# ---------------------------------------------------------------------------
+# AI Bubble / Liquidity Monitor endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/macro/monitor")
+def macro_monitor_latest():
+    """Latest scored bubble-monitor snapshot (all five indicators)."""
+    try:
+        return macro_monitor.get_latest()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/macro/series/{metric}")
+def macro_monitor_series(metric: str):
+    """Full stored time series for one metric (for charting)."""
+    return macro_monitor.get_series(metric)
+
+
+@app.post("/api/macro/refresh")
+def macro_monitor_refresh():
+    """Force a live refresh; persists snapshot and emails on new threshold trips."""
+    try:
+        return macro_monitor.refresh_and_store(send_email=True)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ---------------------------------------------------------------------------
