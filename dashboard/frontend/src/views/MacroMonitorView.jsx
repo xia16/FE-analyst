@@ -56,10 +56,13 @@ function SellBadge({ sell, active }) {
   )
 }
 
+const TIMING = { color: '#818cf8', bg: 'rgba(129,140,248,0.14)', label: 'TIMING' }
+
 function MetricCard({ m, selected, onClick }) {
   const ctx = m.context_only
-  const s = ctx ? STATUS.unavailable : (STATUS[m.status] || STATUS.unavailable)
-  const chip = ctx ? 'CONTEXT' : s.label
+  const info = m.informational
+  const s = ctx ? STATUS.unavailable : info ? TIMING : (STATUS[m.status] || STATUS.unavailable)
+  const chip = ctx ? 'CONTEXT' : info ? 'TIMING' : s.label
   const ring = m.sell_active ? '#dc2626' : (selected ? s.color : null)
   return (
     <Card
@@ -91,6 +94,23 @@ function MetricCard({ m, selected, onClick }) {
         </div>
       )}
       <SellBadge sell={m.sell_signal} active={m.sell_active} />
+    </Card>
+  )
+}
+
+function LiquidityCalendarBanner({ snap }) {
+  const lc = snap.liquidity_calendar
+  if (!lc) return null
+  const tag = lc.phase === 'active'
+    ? `ACTIVE · peak ~${lc.peak} (${lc.days_to_peak}d)`
+    : `UPCOMING in ${lc.days_to_start}d`
+  return (
+    <Card style={{ borderLeft: '3px solid #d97706' }}>
+      <div className="text-[11px] font-bold uppercase tracking-wide text-amber-400 mb-1">
+        📅 Liquidity calendar · {tag}
+      </div>
+      <div className="text-sm font-semibold text-[#e5e7eb]">{lc.label}</div>
+      <p className="text-xs text-[#a0a2ab] mt-1 leading-relaxed">{lc.detail}</p>
     </Card>
   )
 }
@@ -324,6 +344,9 @@ export default function MacroMonitorView() {
           <p className="text-sm text-[#d1d5db] leading-relaxed">{snap.ai_commentary}</p>
         </Card>
       )}
+
+      {/* Scheduled Treasury liquidity-drain window (context, not a trigger) */}
+      <LiquidityCalendarBanner snap={snap} />
 
       {/* High-priority SELL-NOW banner (only when a sell trigger is active) */}
       <SellNowBanner snap={snap} />

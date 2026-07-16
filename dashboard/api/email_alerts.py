@@ -114,9 +114,12 @@ def _pct_bar(pct: float | None, color: str) -> str:
 def _card(m: dict, triggered_keys: set) -> str:
     color, chip_bg = _STATUS.get(m.get("status", "unavailable"), _STATUS["unavailable"])
     ctx = m.get("context_only")
-    chip_label = "CONTEXT" if ctx else m.get("status", "").upper()
+    info = m.get("informational")
+    chip_label = "CONTEXT" if ctx else "TIMING" if info else m.get("status", "").upper()
     if ctx:  # context-only cards are muted — not alert-colored
         color, chip_bg = _STATUS["unavailable"]
+    elif info:  # informational/timing signal — neutral indigo, not an alert colour
+        color, chip_bg = "#a5b4fc", "#1e2140"
     is_trig = (m.get("key") in triggered_keys) and not ctx
     border = color if is_trig else "#2a2d3e"
     pct = m.get("percentile")
@@ -264,6 +267,23 @@ def _topmodel_html(snap: dict) -> str:
     )
 
 
+def _liquidity_calendar_html(snap: dict) -> str:
+    lc = snap.get("liquidity_calendar")
+    if not lc:
+        return ""
+    tag = (f"ACTIVE · peak ~{lc.get('peak')} ({lc.get('days_to_peak')}d)"
+           if lc.get("phase") == "active" else f"UPCOMING in {lc.get('days_to_start')}d")
+    return (
+        f'<div style="background:#1a1710;border:1px solid #3a3320;border-left:3px solid #d97706;'
+        f'border-radius:10px;padding:12px 16px;margin:0 6px 12px">'
+        f'<div style="font:700 11px {_FONT};color:#fbbf24;text-transform:uppercase;'
+        f'letter-spacing:.5px">📅 Liquidity calendar · {tag}</div>'
+        f'<div style="font:700 13px {_FONT};color:#e5e7eb;margin-top:4px">{lc.get("label")}</div>'
+        f'<div style="font:400 12px {_FONT};color:#a0a2ab;margin-top:3px;line-height:1.5">'
+        f'{lc.get("detail")}</div></div>'
+    )
+
+
 def _capex_update_html(snap: dict) -> str:
     if not snap.get("capex_updated"):
         return ""
@@ -331,6 +351,7 @@ def _render_html(snap: dict, triggered: list[dict]) -> str:
         f'{_ai_commentary_html(snap)}'
         f'{_sellnow_html(snap)}'
         f'{_capex_update_html(snap)}'
+        f'{_liquidity_calendar_html(snap)}'
         f'{trip_banner}'
         f'{_confluence_html(snap.get("confluence"))}'
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
@@ -377,6 +398,11 @@ def _render_plain(snap: dict, triggered: list[dict]) -> str:
         for grp in ("yellow", "red", "top"):
             for c in conf.get(grp, []):
                 lines.append(f"  [{grp:6s}] {'MET' if c['met'] else '  -'} {c['label']} ({c['detail']})")
+    lc = snap.get("liquidity_calendar")
+    if lc:
+        when = (f"active, peak ~{lc.get('peak')}" if lc.get("phase") == "active"
+                else f"upcoming in {lc.get('days_to_start')}d")
+        lines += ["", f"LIQUIDITY CALENDAR ({when}): {lc.get('label')} — {lc.get('detail')}"]
     tm = snap.get("top_model")
     if tm:
         lines += ["", f"TOP MODEL ({snap.get('top_model_triggered',0)}/{snap.get('top_model_total',len(tm))} triggered):"]

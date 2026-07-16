@@ -57,7 +57,9 @@ SYSTEM_PROMPT = (
     "a sell call the data doesn't support.\n"
     "Weight the core signals (SOFR-IORB, reserves, TGA, SRF, cloud-capex QoQ rate, "
     "options skew) most; treat [context-only] indicators (e.g. ON RRP) as background "
-    "only. No disclaimers."
+    "only. If a 'Liquidity calendar' window is ACTIVE, briefly note the scheduled "
+    "Treasury drain as a headwind that makes the reserve/TGA readings matter more — "
+    "but it is context, not a trigger. No disclaimers."
 )
 
 
@@ -98,6 +100,12 @@ def _summarize(snap: dict) -> str:
         )
     if snap.get("capex_updated"):
         lines.append("NOTE: a NEW cloud-capex quarter was filed today.")
+    lc = snap.get("liquidity_calendar")
+    if lc:
+        when = (f"ACTIVE, peak ~{lc.get('peak')} ({lc.get('days_to_peak')}d away)"
+                if lc.get("phase") == "active"
+                else f"UPCOMING in {lc.get('days_to_start')}d")
+        lines.append(f"\nLiquidity calendar ({when}): {lc.get('label')}. {lc.get('detail')}")
     return "\n".join(lines)
 
 

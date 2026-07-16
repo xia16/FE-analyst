@@ -318,6 +318,7 @@ class LiquidityMonitor:
             "reference_yellow": m.get("reference_yellow"),
             "reference_red": m.get("reference_red"),
             "context_only": bool(m.get("context_only", False)),
+            "informational": bool(m.get("informational", False)),
             "series": series[-self.window :] if series else [],
         }
         if not series:
@@ -417,11 +418,21 @@ class LiquidityMonitor:
         capex_series = metrics.get("cloud_capex_accel", {}).get("series", [])
         capex_decel = self._capex_rolling_over(capex_series)
 
+        # SOFR-IORB must be positive on CONSECUTIVE days (creator: "连续转正"),
+        # not a single-day blip — a lone positive print is not a yellow signal.
+        sofr_series = metrics.get("sofr_iorb_spread", {}).get("series", [])
+        sofr_days = int(c.get("sofr_positive_days", 2))
+        sofr_thr = c.get("sofr_positive_bps", 0.0)
+        sofr_sustained = (
+            len(sofr_series) >= sofr_days
+            and all(p["value"] > sofr_thr for p in sofr_series[-sofr_days:])
+        )
+
         def cond(label, met, detail):
             return {"label": label, "met": bool(met), "detail": detail}
 
         yellow = [
-            cond("SOFR-IORB positive", sofr is not None and sofr > c.get("sofr_positive_bps", 0.0),
+            cond(f"SOFR-IORB positive {sofr_days}d", sofr_sustained,
                  f"{sofr:+.1f}bp" if sofr is not None else "n/a"),
             cond("Reserves breaking $2.9T", reserves is not None and reserves < c.get("reserves_yellow_break", 2900000),
                  f"${reserves/1e6:.2f}T" if reserves is not None else "n/a"),
@@ -574,6 +585,25 @@ class LiquidityMonitor:
                 return f"late {self._MONTHS[mo]} {now.year}"
         return f"late {self._MONTHS[months[0]]} {now.year + 1}"
 
+    def _liquidity_calendar(self) -> dict | None:
+        """Active/imminent Treasury liquidity-drain window (context, not a sell)."""
+        cfg = self.cfg.get("liquidity_calendar", {})
+        lead = int(cfg.get("lead_days", 30))
+        today = datetime.utcnow().date()
+        for e in cfg.get("events", []):
+            try:
+                start = date.fromisoformat(e["start"])
+                peak = date.fromisoformat(e["peak"])
+            except (ValueError, KeyError):
+                continue
+            if start <= today <= peak:
+                return {"label": e["label"], "detail": e["detail"], "phase": "active",
+                        "days_to_peak": (peak - today).days, "peak": e["peak"]}
+            if today < start and (start - today).days <= lead:
+                return {"label": e["label"], "detail": e["detail"], "phase": "upcoming",
+                        "days_to_start": (start - today).days, "peak": e["peak"]}
+        return None
+
     def _top_model(self) -> list[dict]:
         """Evaluate the creator's market-top checklist (fully automated sources)."""
         out = []
@@ -685,6 +715,7 @@ class LiquidityMonitor:
             "card_alert_status": card_alert,
             "sell_now": sell_now,
             "sell_reasons": sell_reasons,
+            "liquidity_calendar": self._liquidity_calendar(),
             "metrics": metrics,
             "confluence": confluence,
             "top_model": top_model,
