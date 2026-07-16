@@ -55,9 +55,9 @@ metrics:
     unit: usd_millions
     display_unit: usd_trillions
     direction: up_bad         # TGA rebuild drains reserves
-    reference_yellow: 900000  # $0.9T approaching
-    reference_red: 1000000    # $1.0T  (creator's yellow-alert level)
-    note: "TGA moving toward $1T drains bank reserves — a liquidity-tightening tell."
+    reference_yellow: 950000  # $0.95T heading to $1T (matches the yellow-combo)
+    reference_red: null       # per the video TGA→$1T is a YELLOW-combo element, never a standalone red
+    note: "TGA moving toward $1T drains bank reserves — a liquidity-tightening tell. Only a YELLOW-combo element (with SOFR positive + reserves breaking $2.9T), never a standalone alert."
 
   # ----------------------------------------------------------------- on_rrp
   on_rrp:
@@ -117,10 +117,11 @@ metrics:
     source: cboe_skew
     url: "https://cdn.cboe.com/api/global/us_indices/daily_prices/SKEW_History.csv"
     unit: index               # CBOE SKEW level (~100 = normal, higher = fatter put tail)
-    direction: down_bad       # LOW/falling skew = cheap puts = complacency / melt-up setup
-    reference_yellow: 135      # low-side complacency (~2yr p10)
-    reference_red: 128         # extreme complacency (near multi-year low)
-    note: "PROXY for the video's call-vs-put risk-reversal signal (a true risk-reversal needs a live options feed). CBOE's official skew gauge = priced cost of OTM puts vs ATM. LOW/falling SKEW = cheap downside hedges = the complacency behind melt-ups (calls richer than puts). HIGH SKEW = heavy crash-hedging. Official CBOE feed — no key, no rate limits."
+    direction: down_bad       # LOW/inverted skew = calls richer than puts = melt-up IGNITION
+    informational: true       # timing/ignition signal in the video — NOT a top/sell alert
+    reference_yellow: 135      # low-side (~2yr p10) — approaching inversion
+    reference_red: 128         # extreme inversion (near multi-year low)
+    note: "TIMING signal, NOT a sell. Per the video, calls becoming richer than puts (extreme inversion) + shrinking, drop-resistant spot = dealers forced to buy = the SECOND WAVE IGNITING — a participate/melt-up cue, not a top. PROXY via CBOE SKEW (a true call-vs-put risk-reversal needs a live options feed): LOW/falling SKEW ≈ that inversion. Never drives a sell."
 
 # ----------------------------------------------------------------- confluence
 # The creator's alerts are CONFLUENCE (AND/OR) conditions, not independent per-
@@ -130,6 +131,7 @@ confluence:
   reserves_yellow_break: 2900000  # reserves breaking $2.9T (millions) → yellow-combo
   reserves_red_break: 2800000     # reserves < $2.8T → red-combo
   sofr_positive_bps: 0.0          # SOFR-IORB turns positive → yellow-combo
+  sofr_positive_days: 2           # ...but only if positive on CONSECUTIVE days ("连续转正")
   sofr_red_bps: 3.0               # SOFR-IORB > 3bps (95th pctile) → red-combo
   tga_approaching: 950000         # TGA ≥ $0.95T heading to $1T (millions) → yellow-combo
   srf_spike: 5000000              # SRF accepted ≥ $5B (thousands) → red trigger (real spike, not routine)
@@ -180,6 +182,19 @@ earnings_calendar:
   # cron for the quarterly checker: run daily through the report windows
   check_cron_months: "1,2,4,5,7,8,10,11"
   check_cron_hour: 11
+
+# ------------------------------------------------------- liquidity calendar
+# Known, time-bound Treasury / funding liquidity-DRAIN windows the video flags.
+# NOT a sell trigger — a contextual heads-up that the liquidity backdrop is
+# tightening on a schedule, so the reserve / SOFR-IORB / TGA readings deserve
+# extra weight through the window (and the AI note should mention it).
+liquidity_calendar:
+  lead_days: 30            # start flagging this many days before a window opens
+  events:
+    - start: "2026-07-01"
+      peak: "2026-09-30"
+      label: "Treasury Q3 refunding drain (Jul–Sep 2026)"
+      detail: "Treasury plans ~$671B net borrowing Jul–Sep 2026 with the TGA rebuilding toward ~$950B by end-September; bill issuance accelerates from July. The Aug-15 refunding announcement and the September tax date + debt-ceiling / TGA rebuild make ~September the peak liquidity stress test — a scheduled headwind for the melt-up. Reserves and TGA deserve extra weight through this window."
 
 # ------------------------------------------------------------------- alerting
 alerts:

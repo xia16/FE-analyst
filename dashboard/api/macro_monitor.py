@@ -218,30 +218,36 @@ def refresh_and_store(send_email: bool = True, digest: bool = False) -> dict:
         conn.close()
 
 
+_CONF_LEVEL = {"normal": 0, "yellow": 1, "red": 2, "top": 3}
+
+
 def _detect_trips(prev: dict | None, snap: dict) -> list[dict]:
-    """Return metrics whose status severity increased since the last snapshot."""
-    prev_metrics = (prev or {}).get("metrics", {})
-    triggered = []
-    for key, m in snap["metrics"].items():
-        if m.get("context_only"):
-            continue  # context metrics (e.g. ON RRP) never fire alerts
-        now = _SEV.get(m["status"], 0)
-        was = _SEV.get(prev_metrics.get(key, {}).get("status", "normal"), 0)
-        # Fire when moving up into yellow/red (or, first run, already in yellow/red).
-        if now >= _SEV["yellow"] and now > was:
-            prev_status = prev_metrics.get(key, {}).get("status", "—") if prev else "first run"
-            triggered.append(
-                {
-                    "key": key,
-                    "label": m["label"],
-                    "status": m["status"],
-                    "current": m.get("current"),
-                    "display_value": m.get("display_value"),
-                    "percentile": m.get("percentile"),
-                    "transition": f"{prev_status} → {m['status']}",
-                }
-            )
-    return triggered
+    """Alert ONLY when the creator's actual framework escalates.
+
+    The video's alerts are CONFLUENCE combos (SOFR+reserves+TGA yellow; the red
+    combo; the resonance top), plus standalone sells (handled separately via
+    sell_now). Individual card status changes (e.g. SRF ticking to yellow on a
+    routine repo op, TGA at $0.9T, reserves at $2.9T, low options-skew) are NOT
+    thesis alerts — firing on them produced false alarms. So we escalate the email
+    only on a confluence-LEVEL increase; sell triggers are caught by sell_now.
+    """
+    now_conf = snap.get("confluence", {}) or {}
+    now_level = now_conf.get("level", "normal")
+    prev_level = ((prev or {}).get("confluence", {}) or {}).get("level", "normal")
+    if _CONF_LEVEL.get(now_level, 0) <= _CONF_LEVEL.get(prev_level, 0):
+        return []  # no escalation
+
+    met = [c["label"] for grp in ("yellow", "red", "top")
+           for c in now_conf.get(grp, []) if c.get("met")]
+    return [{
+        "key": "confluence",
+        "label": f"Confluence combo → {now_level.upper()}",
+        "status": "red" if now_level in ("red", "top") else "yellow",
+        "current": None,
+        "display_value": ", ".join(met) if met else now_level.upper(),
+        "percentile": None,
+        "transition": f"{prev_level} → {now_level}",
+    }]
 
 
 def get_latest() -> dict:
