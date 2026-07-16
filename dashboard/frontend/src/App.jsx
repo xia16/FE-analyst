@@ -14,6 +14,7 @@ import SearchOverlay from './components/SearchOverlay'
 import MyPortfolioView from './views/MyPortfolioView'
 import StockDetailView from './views/StockDetailView'
 import { ReportsView, GenerateReportView } from './views/ReportsView'
+import MacroMonitorView from './views/MacroMonitorView'
 
 // ─── Watchlist Dashboard (was PortfolioView) ──────────────
 
@@ -649,6 +650,7 @@ export default function App() {
         {activeView === 'alerts' && (
           <AlertsView onSelectTicker={handleSelectTicker} domains={domains} />
         )}
+        {activeView === 'macro' && <MacroMonitorView />}
         {activeView === 'detail' && (
           <StockDetailView ticker={selectedTicker} setTicker={setSelectedTicker} allStocks={allStocks} holdingTickers={holdingTickers} />
         )}

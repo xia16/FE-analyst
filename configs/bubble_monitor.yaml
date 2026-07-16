@@ -1,0 +1,191 @@
+# AI Bubble / Liquidity Monitor configuration
+#
+# Tracks the five indicators from the "AI bubble mechanics" thesis:
+#   1. Downstream cloud capex sequential growth rate (2nd derivative)
+#   2. Bank reserve balances (Fed H.4.1)
+#   3. Options market skew (call vs put richness)
+#   4. SOFR - IORB spread
+#   5. Standing Repo Facility (SRF) usage  [+ TGA and ON RRP context]
+#
+# Signal philosophy: each metric is scored by its ROLLING PERCENTILE over a
+# trailing window (auto-recalibrates as the Fed's balance-sheet regime drifts).
+# The creator's absolute thresholds are kept as `reference_*` fields and shown
+# on the dashboard as static reference lines, NOT as the primary alert trigger.
+
+percentile_window_days: 504   # ~2 trading years
+
+metrics:
+  # ---------------------------------------------------------------- reserves
+  reserves:
+    label: "Bank Reserve Balances (H.4.1)"
+    source: fred
+    series: WRESBAL           # millions USD, weekly
+    unit: usd_millions
+    display_unit: usd_trillions
+    direction: down_bad       # falling reserves = draining liquidity
+    reference_yellow: 2900000 # $2.9T  (creator: "breaking $2.9T heading to $2.8T" = yellow)
+    reference_red: 2500000    # $2.5T  (creator: rapid drop here = unconditionally liquidate)
+    sell_signal:
+      priority: high          # standalone SELL-NOW trigger
+      when: "Rapid drop below $2.5T (no major crisis)"
+      action: "Unconditionally liquidate — Rule 1, 'no matter how euphoric'"
+    note: "Above $2.8T = liquidity supports melt-up. Breaking $2.9T→$2.8T = yellow; rapid drop <$2.5T (no crisis) = clear positions."
+
+  # --------------------------------------------------------------- sofr_iorb
+  sofr_iorb_spread:
+    label: "SOFR - IORB Spread"
+    source: fred_spread
+    series_a: SOFR            # percent, daily
+    series_b: IORB            # percent, daily
+    unit: basis_points        # computed as (SOFR-IORB)*100
+    direction: up_bad         # positive/widening = funding stress
+    reference_yellow: 0.0     # turns positive consecutively = yellow
+    reference_red: 3.0        # >3bps = 95th-pctile extreme = red
+    sell_signal:
+      priority: confirm       # structural-top confirmation (in combo)
+      when: ">3bps (95th-pctile) AND reserves <$2.8T"
+      action: "Structural-top confirmation — clear positions"
+    note: "Positive & widening = reserves scarce. >3bps is a 95th-pctile funding-stress extreme."
+
+  # --------------------------------------------------------------------- tga
+  tga:
+    label: "Treasury General Account"
+    source: fred
+    series: WTREGEN           # millions USD, weekly
+    unit: usd_millions
+    display_unit: usd_trillions
+    direction: up_bad         # TGA rebuild drains reserves
+    reference_yellow: 900000  # $0.9T approaching
+    reference_red: 1000000    # $1.0T  (creator's yellow-alert level)
+    note: "TGA moving toward $1T drains bank reserves — a liquidity-tightening tell."
+
+  # ----------------------------------------------------------------- on_rrp
+  on_rrp:
+    label: "Overnight Reverse Repo (ON RRP)"
+    source: fred
+    series: RRPONTSYD         # billions USD, daily
+    unit: usd_billions
+    direction: down_bad       # near-zero RRP = buffer exhausted
+    context_only: true        # NOT one of the creator's named signals — shown for context,
+                              # excluded from overall status + email trips (see analysis)
+    reference_yellow: 100     # $100B buffer left
+    reference_red: 20         # ~drained
+    note: "Context only (not a creator signal). RRP is the reserve buffer drawn down first; near zero = next drains hit reserves directly."
+
+  # ----------------------------------------------------------------- srf
+  srf_usage:
+    label: "Standing Repo Facility Usage"
+    source: nyfed_srf
+    unit: usd_thousands       # NY Fed reports in thousands
+    lookback_ops: 40
+    direction: up_bad         # any sustained take-up = stress
+    reference_yellow: 1       # any non-zero acceptance
+    reference_red: 5000000    # $5B+ (structural, like Sep-2019)
+    sell_signal:
+      priority: confirm       # structural-top confirmation — only WITH reserve/funding stress
+      when: "Sudden spike ≥$5B WHILE reserves draining (<$2.9T) or SOFR positive"
+      action: "Structural-top confirmation (corroborated) — clear positions"
+    note: "A sudden spike in SRF take-up, esp. with reserves <$2.8T, is a high-probability structural-top tell."
+
+  # --------------------------------------------------------------- capex_accel
+  cloud_capex_accel:
+    label: "Cloud Capex Sequential Growth (2nd deriv)"
+    source: sec_capex
+    unit: percent             # QoQ growth rate, %
+    direction: down_bad       # DECELERATION is the warning (the ultimate sell signal)
+    reference_yellow: 5.0      # QoQ growth slowing toward single digits
+    reference_red: 0.0         # QoQ growth flat/negative = demand stalled
+    sell_signal:
+      priority: high          # THE #1 SELL-NOW trigger
+      when: "QoQ growth peaks/rolls over vs same quarter last year (even if profit hits highs)"
+      action: "Liquidate immediately — his most important top-escape signal"
+    companies:
+      MSFT:  { cik: "0000789019" }
+      GOOGL: { cik: "0001652044" }
+      META:  { cik: "0001326801" }
+      AMZN:  { cik: "0001018724" }
+    # SEC us-gaap concept tags to try, in order (companies tag capex differently)
+    concepts:
+      - PaymentsToAcquirePropertyPlantAndEquipment
+      - PaymentsToAcquireProductiveAssets
+      - PaymentsForCapitalImprovements
+    note: "Watch the RATE, not the level. If absolute capex still rises but QoQ growth peaks/rolls over, upstream demand has stalled."
+
+  # ---------------------------------------------------------------- options_skew
+  options_skew:
+    label: "CBOE SKEW Index (options skew)"
+    source: cboe_skew
+    url: "https://cdn.cboe.com/api/global/us_indices/daily_prices/SKEW_History.csv"
+    unit: index               # CBOE SKEW level (~100 = normal, higher = fatter put tail)
+    direction: down_bad       # LOW/falling skew = cheap puts = complacency / melt-up setup
+    reference_yellow: 135      # low-side complacency (~2yr p10)
+    reference_red: 128         # extreme complacency (near multi-year low)
+    note: "PROXY for the video's call-vs-put risk-reversal signal (a true risk-reversal needs a live options feed). CBOE's official skew gauge = priced cost of OTM puts vs ATM. LOW/falling SKEW = cheap downside hedges = the complacency behind melt-ups (calls richer than puts). HIGH SKEW = heavy crash-hedging. Official CBOE feed — no key, no rate limits."
+
+# ----------------------------------------------------------------- confluence
+# The creator's alerts are CONFLUENCE (AND/OR) conditions, not independent per-
+# metric thresholds. This block evaluates his actual yellow/red/top logic across
+# metrics. Thresholds in each metric's native units.
+confluence:
+  reserves_yellow_break: 2900000  # reserves breaking $2.9T (millions) → yellow-combo
+  reserves_red_break: 2800000     # reserves < $2.8T → red-combo
+  sofr_positive_bps: 0.0          # SOFR-IORB turns positive → yellow-combo
+  sofr_red_bps: 3.0               # SOFR-IORB > 3bps (95th pctile) → red-combo
+  tga_approaching: 950000         # TGA ≥ $0.95T heading to $1T (millions) → yellow-combo
+  srf_spike: 5000000              # SRF accepted ≥ $5B (thousands) → red trigger (real spike, not routine)
+  # Rules (evaluated in liquidity_monitor):
+  #   YELLOW = SOFR positive AND reserves<$2.9T AND TGA→$1T   (all three)
+  #   RED    = (SOFR>3bps AND reserves<$2.8T)  OR  SRF spike
+  #   TOP    = (YELLOW or RED liquidity) AND cloud-capex QoQ growth rolling over
+  #            (the "two sets resonate" condition)
+
+# ------------------------------------------------------------------ top model
+# A SECOND framework the creator maintains: a market-top checklist. FULLY
+# AUTOMATED — only indicators with a robust free source are kept. The video's
+# other four (margin debt, SPX 0DTE share, insider sell/buy ratio, Nasdaq-100
+# forward P/E) have NO reliable free feed, so they are deliberately omitted
+# rather than hand-maintained. Each entry carries its own as-of date.
+top_model:
+  buffett_indicator:
+    label: "Buffett Indicator (mkt cap / GDP)"
+    source: fred_ratio
+    series_num: NCBEILQ027S   # corp equities liability (Z.1), millions — quarterly
+    series_den: GDP           # GDP, billions (annualized) — quarterly
+    scale: 0.001              # millions→billions so ratio is unitless
+    unit: percent_ratio
+    quarterly: true           # depends on the quarterly Z.1 / GDP releases
+    trigger_above: 200        # >200% = triggered (creator cited 234%)
+  m2_index_divergence:
+    label: "M2 vs Nasdaq YoY Divergence"
+    source: fred_yoy_diff
+    series_a: M2SL            # M2 money supply (monthly)
+    series_b: NASDAQCOM       # Nasdaq Composite (daily)
+    unit: percent
+    trigger_below: -15        # divergence < -15% = triggered (creator cited -24.1%)
+  sp500_top10_weight:
+    label: "S&P 500 Top-10 Weight"
+    source: ssga_top10        # State Street SPY daily holdings file (official)
+    url: "https://www.ssga.com/us/en/intermediary/etfs/library-content/products/fund-data/etfs/us/holdings-daily-us-en-spy.xlsx"
+    unit: percent
+    trigger_above: 35         # >35% = record concentration = triggered
+
+# ------------------------------------------------------------- earnings calendar
+# We know when the hyperscalers file — capex (SEC 10-Q) only changes in these
+# windows, so a dedicated checker runs then to pick up new quarters immediately.
+earnings_calendar:
+  # Calendar-quarter results are filed roughly:
+  #   Q4 (Oct-Dec) → late Jan   |  Q1 (Jan-Mar) → late Apr
+  #   Q2 (Apr-Jun) → late Jul   |  Q3 (Jul-Sep) → late Oct
+  report_months: [1, 4, 7, 10]   # first month of each reporting window
+  # cron for the quarterly checker: run daily through the report windows
+  check_cron_months: "1,2,4,5,7,8,10,11"
+  check_cron_hour: 11
+
+# ------------------------------------------------------------------- alerting
+alerts:
+  # Email fires only when a metric ENTERS yellow/red or crosses vs last snapshot.
+  email_enabled: true
+  recipient: adamxyz96@gmail.com
+  # 'percentile' alerts trip when trailing percentile breaches these:
+  yellow_percentile: 90
+  red_percentile: 97

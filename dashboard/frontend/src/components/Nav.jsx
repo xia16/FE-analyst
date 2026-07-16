@@ -25,6 +25,7 @@ export default function Nav({ activeDomain, setActiveDomain, activeView, setActi
   // Right-side tool buttons
   const globalTools = [
     { id: 'alerts', label: 'Alerts' },
+    { id: 'macro', label: 'Bubble' },
     { id: 'detail', label: 'Detail' },
     { id: 'generate', label: 'Analyze' },
     { id: 'reports', label: 'Reports' },
