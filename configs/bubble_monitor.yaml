@@ -196,6 +196,25 @@ liquidity_calendar:
       label: "Treasury Q3 refunding drain (Jul–Sep 2026)"
       detail: "Treasury plans ~$671B net borrowing Jul–Sep 2026 with the TGA rebuilding toward ~$950B by end-September; bill issuance accelerates from July. The Aug-15 refunding announcement and the September tax date + debt-ceiling / TGA rebuild make ~September the peak liquidity stress test — a scheduled headwind for the melt-up. Reserves and TGA deserve extra weight through this window."
 
+# ------------------------------------------------------- unit economics
+# The AI-bubble "layered collapse" thesis (companion video): watch the capital
+# structure / demand economics, computed from quarterly 10-Q financials. Only the
+# SEC-automatable pieces are here (DSO + capex carrying-cost); the survey-based
+# ones (NRR, pilot-conversion, down-rounds) have no free feed and are omitted.
+# A DeepSeek report is generated whenever a NEW quarter is filed.
+unit_economics:
+  companies:
+    MSFT:  { cik: "0000789019" }
+    GOOGL: { cik: "0001652044" }
+    META:  { cik: "0001326801" }
+    AMZN:  { cik: "0001018724" }
+  ar_concepts:      [AccountsReceivableNetCurrent, ReceivablesNetCurrent]
+  revenue_concepts: [RevenueFromContractWithCustomerExcludingAssessedTax, Revenues]
+  days_in_quarter: 91
+  dso_alert_yoy_days: 5     # DSO rising >5 days YoY = watch (vendor-financing tell)
+  carrying_rate: 0.25       # annual carrying cost per $1 of capex (~10% capital + ~15% deprec)
+  gross_margin: 0.65        # to translate carrying cost → external revenue needed
+
 # ------------------------------------------------------------------- alerting
 alerts:
   # Email fires only when a metric ENTERS yellow/red or crosses vs last snapshot.
