@@ -60,6 +60,7 @@ COPY dashboard/api/stock_index.py /app/dashboard/api/stock_index.py
 COPY dashboard/api/macro_monitor.py /app/dashboard/api/macro_monitor.py
 COPY dashboard/api/email_alerts.py /app/dashboard/api/email_alerts.py
 COPY dashboard/api/ai_commentary.py /app/dashboard/api/ai_commentary.py
+COPY dashboard/api/unit_economics.py /app/dashboard/api/unit_economics.py
 COPY dashboard/api/send_daily_digest.py /app/dashboard/api/send_daily_digest.py
 
 # Seed portfolio DB at build time (bakes holdings into image)

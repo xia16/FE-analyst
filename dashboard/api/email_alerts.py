@@ -267,6 +267,45 @@ def _topmodel_html(snap: dict) -> str:
     )
 
 
+def _unit_economics_html(snap: dict) -> str:
+    ue = snap.get("unit_economics") or {}
+    report = ue.get("report")
+    if not report:
+        return ""
+    d = ue.get("data") or {}
+    b = 1e9
+    is_new = snap.get("unit_economics_new")
+    badge = (f'<span style="font:700 9px {_FONT};color:#fff;background:#7c3aed;'
+             f'padding:2px 7px;border-radius:5px;margin-left:8px">NEW QUARTER</span>') if is_new else ""
+    # compact per-company DSO strip (flag YoY increases beyond the alert threshold)
+    alert_days = d.get("dso_alert_yoy_days", 5)
+    cells = ""
+    for c in d.get("companies", []):
+        chg = c.get("dso_change")
+        rising = chg is not None and chg >= alert_days
+        chg_txt = (f" ({chg:+.1f}d)" if chg is not None else "")
+        col = "#ef4444" if rising else "#8b8d97"
+        cells += (f'<td style="padding:4px 10px;font:400 11px {_FONT};color:#d1d5db">'
+                  f'{c["company"]} <b>{c["dso"]}d</b><span style="color:{col}">{chg_txt}</span></td>')
+    stat = ""
+    if d.get("ttm_capex_usd"):
+        stat = (f'<div style="font:400 11px {_FONT};color:#8b8d97;margin-top:6px">'
+                f'TTM capex ≈ ${d["ttm_capex_usd"]/b:.0f}B → carrying ≈ '
+                f'${d["annual_carrying_cost_usd"]/b:.0f}B/yr → needs ≈ '
+                f'${(d.get("external_revenue_needed_usd") or 0)/b:.0f}B/yr external AI gross profit · '
+                f'aggregate DSO {d.get("aggregate_dso")}d</div>')
+    return (
+        f'<div style="background:#16121f;border:1px solid #3a2f52;border-left:3px solid #a78bfa;'
+        f'border-radius:10px;padding:14px 16px;margin:0 6px 12px">'
+        f'<div style="font:700 11px {_FONT};color:#c4b5fd;text-transform:uppercase;'
+        f'letter-spacing:.5px">📊 Quarterly unit-economics report · {d.get("quarter","")}{badge}</div>'
+        f'<div style="font:400 13px {_FONT};color:#d1d5db;line-height:1.6;margin-top:6px">{report}</div>'
+        f'{stat}'
+        f'<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:4px"><tr>{cells}</tr></table>'
+        f'</div>'
+    )
+
+
 def _liquidity_calendar_html(snap: dict) -> str:
     lc = snap.get("liquidity_calendar")
     if not lc:
@@ -351,6 +390,7 @@ def _render_html(snap: dict, triggered: list[dict]) -> str:
         f'{_ai_commentary_html(snap)}'
         f'{_sellnow_html(snap)}'
         f'{_capex_update_html(snap)}'
+        f'{_unit_economics_html(snap)}'
         f'{_liquidity_calendar_html(snap)}'
         f'{trip_banner}'
         f'{_confluence_html(snap.get("confluence"))}'
@@ -403,6 +443,11 @@ def _render_plain(snap: dict, triggered: list[dict]) -> str:
         when = (f"active, peak ~{lc.get('peak')}" if lc.get("phase") == "active"
                 else f"upcoming in {lc.get('days_to_start')}d")
         lines += ["", f"LIQUIDITY CALENDAR ({when}): {lc.get('label')} — {lc.get('detail')}"]
+    ue = snap.get("unit_economics") or {}
+    if ue.get("report"):
+        d = ue.get("data") or {}
+        tag = " [NEW QUARTER]" if snap.get("unit_economics_new") else ""
+        lines += ["", f"QUARTERLY UNIT-ECONOMICS REPORT ({d.get('quarter','')}){tag}:", ue["report"]]
     tm = snap.get("top_model")
     if tm:
         lines += ["", f"TOP MODEL ({snap.get('top_model_triggered',0)}/{snap.get('top_model_total',len(tm))} triggered):"]

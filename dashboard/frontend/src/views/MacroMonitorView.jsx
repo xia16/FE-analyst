@@ -177,6 +177,50 @@ function ConfluenceBanner({ conf }) {
   )
 }
 
+function UnitEconomicsPanel({ snap }) {
+  const ue = snap.unit_economics
+  if (!ue || !ue.report) return null
+  const d = ue.data || {}
+  const b = 1e9
+  const alertDays = d.dso_alert_yoy_days || 5
+  return (
+    <Card style={{ borderLeft: '3px solid #a78bfa' }}>
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className="text-[11px] font-bold uppercase tracking-wide text-violet-300">
+          📊 Quarterly Unit-Economics Report · {d.quarter}
+        </span>
+        {snap.unit_economics_new && (
+          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-600 text-white">NEW QUARTER</span>
+        )}
+      </div>
+      <p className="text-sm text-[#d1d5db] leading-relaxed">{ue.report}</p>
+      {d.ttm_capex_usd && (
+        <p className="text-[11px] text-[#8b8d97] mt-3">
+          TTM capex ≈ ${(d.ttm_capex_usd / b).toFixed(0)}B → carrying ≈ ${(d.annual_carrying_cost_usd / b).toFixed(0)}B/yr →
+          needs ≈ ${((d.external_revenue_needed_usd || 0) / b).toFixed(0)}B/yr external AI gross profit · aggregate DSO {d.aggregate_dso}d
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2 mt-2">
+        {(d.companies || []).map((c) => {
+          const rising = c.dso_change != null && c.dso_change >= alertDays
+          return (
+            <span key={c.company} className="text-[11px] px-2 py-1 rounded bg-[#0f1117]/50 border border-[#2a2d3e]">
+              <span className="text-[#d1d5db]">{c.company}</span> <b className="text-white">{c.dso}d</b>
+              {c.dso_change != null && (
+                <span className={rising ? 'text-red-400' : 'text-[#6b7280]'}> {c.dso_change >= 0 ? '+' : ''}{c.dso_change}d YoY</span>
+              )}
+            </span>
+          )
+        })}
+      </div>
+      <p className="text-[10px] text-[#8b8d97] mt-3">
+        From the "layered collapse" thesis — DSO (vendor-financing tell) + capex carrying-cost, computed from 10-Q filings;
+        report regenerates each new quarter. Survey indicators (NRR, pilot-conversion, down-rounds) omitted (no free feed).
+      </p>
+    </Card>
+  )
+}
+
 function TopModelPanel({ snap }) {
   const tm = snap.top_model || []
   if (!tm.length) return null
@@ -374,6 +418,9 @@ export default function MacroMonitorView() {
           <MetricChart metricKey={selected} meta={selectedMeta} />
         </Card>
       )}
+
+      {/* Quarterly unit-economics report (layered-collapse thesis) */}
+      <UnitEconomicsPanel snap={snap} />
 
       {/* Secondary top-model checklist */}
       <TopModelPanel snap={snap} />

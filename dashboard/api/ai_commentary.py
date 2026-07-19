@@ -109,21 +109,21 @@ def _summarize(snap: dict) -> str:
     return "\n".join(lines)
 
 
-def generate_commentary(snap: dict, timeout: int = 45) -> str | None:
-    """Return DeepSeek's one-paragraph daily note, or None on any failure."""
+def call_deepseek(system_prompt: str, user_content: str,
+                  max_tokens: int = 320, timeout: int = 45) -> str | None:
+    """Generic DeepSeek chat call. Returns text, or None if unconfigured/failed."""
     key = os.getenv("DEEPSEEK_API_KEY")
     if not key:
-        logger.info("DEEPSEEK_API_KEY not set — skipping AI commentary")
+        logger.info("DEEPSEEK_API_KEY not set — skipping")
         return None
-
     body = {
         "model": MODEL,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": "Today's readings:\n\n" + _summarize(snap)},
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
         ],
         "temperature": 0.4,
-        "max_tokens": 320,
+        "max_tokens": max_tokens,
         "stream": False,
     }
     req = urllib.request.Request(
@@ -134,9 +134,15 @@ def generate_commentary(snap: dict, timeout: int = 45) -> str | None:
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.load(resp)
-        text = data["choices"][0]["message"]["content"].strip()
-        logger.info("DeepSeek commentary generated (%d chars)", len(text))
-        return text
+        return data["choices"][0]["message"]["content"].strip()
     except Exception as e:  # noqa: BLE001
-        logger.error("DeepSeek commentary failed: %s", e)
+        logger.error("DeepSeek call failed: %s", e)
         return None
+
+
+def generate_commentary(snap: dict, timeout: int = 45) -> str | None:
+    """Return DeepSeek's one-paragraph daily note, or None on any failure."""
+    txt = call_deepseek(SYSTEM_PROMPT, "Today's readings:\n\n" + _summarize(snap), timeout=timeout)
+    if txt:
+        logger.info("DeepSeek commentary generated (%d chars)", len(txt))
+    return txt

@@ -188,6 +188,19 @@ def refresh_and_store(send_email: bool = True, digest: bool = False) -> dict:
             logger.warning("AI commentary failed: %s", e)
             snap["ai_commentary"] = None
 
+        # 3c) Unit-economics (from quarterly 10-Q financials). Generates + stores a
+        #     DeepSeek report when a NEW quarter is filed; else reuses the stored one.
+        unit_econ_new = False
+        try:
+            import unit_economics
+            ue = unit_economics.refresh(generate=True)
+            snap["unit_economics"] = {"data": ue.get("data"), "report": ue.get("report")}
+            unit_econ_new = bool(ue.get("is_new_quarter"))
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Unit-economics refresh failed: %s", e)
+            snap["unit_economics"] = None
+        snap["unit_economics_new"] = unit_econ_new
+
         # 4) Detect newly-tripped metrics (severity increased vs previous snapshot).
         triggered = _detect_trips(prev, snap)
 
@@ -206,9 +219,10 @@ def refresh_and_store(send_email: bool = True, digest: bool = False) -> dict:
         if capex_updated:
             logger.info("New cloud-capex quarter detected: %s → %s", prev_q, new_q)
 
-        # 7) Alert — email on trips, digest, a NEW sell-now state, or a fresh quarter.
+        # 7) Alert — email on trips, digest, a NEW sell-now state, a fresh capex
+        #    quarter, or a fresh unit-economics report (the "separate push").
         sell_transition = snap.get("sell_now") and not (prev or {}).get("sell_now", False)
-        if send_email and (triggered or digest or sell_transition or capex_updated):
+        if send_email and (triggered or digest or sell_transition or capex_updated or unit_econ_new):
             import email_alerts
 
             email_alerts.send_snapshot(snap, triggered, digest=digest)
