@@ -51,7 +51,8 @@ _SYS_PROMPT = (
 
 # --------------------------------------------------------------------------- db
 def _conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn.execute("PRAGMA busy_timeout=8000")
     conn.execute(
         """CREATE TABLE IF NOT EXISTS unit_economics_reports (
                quarter TEXT PRIMARY KEY, filed TEXT, generated_at TEXT,

@@ -69,7 +69,8 @@ _SEV = {"unavailable": -1, "normal": 0, "yellow": 1, "red": 2}
 
 # --------------------------------------------------------------------------- db
 def _conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn.execute("PRAGMA busy_timeout=8000")
     conn.execute(
         """CREATE TABLE IF NOT EXISTS macro_series (
                metric TEXT, date TEXT, value REAL, extra TEXT,
@@ -164,6 +165,11 @@ def refresh_and_store(send_email: bool = True, digest: bool = False) -> dict:
                     reeval["stale"] = True
                     snap["metrics"][key] = reeval
                     logger.info("Backfilled %s from stored series (stale)", key)
+        # Commit + close the series writes NOW so unit_economics (step 3c) can write
+        # to the same SQLite file without a "database is locked" conflict.
+        conn.commit()
+        conn.close()
+        conn = None
 
         # 2) Recompute the per-card aggregate after backfill (excluding context-only).
         #    overall_status stays as the confluence-based headline from snapshot() —
@@ -204,7 +210,8 @@ def refresh_and_store(send_email: bool = True, digest: bool = False) -> dict:
         # 4) Detect newly-tripped metrics (severity increased vs previous snapshot).
         triggered = _detect_trips(prev, snap)
 
-        # 5) Persist snapshot.
+        # 5) Persist snapshot (reopen — the series conn was closed after step 1).
+        conn = _conn()
         conn.execute(
             "INSERT OR REPLACE INTO macro_snapshots (ts, overall, payload) VALUES (?,?,?)",
             (snap["generated_at"], snap["overall_status"], json.dumps(snap)),
@@ -229,7 +236,8 @@ def refresh_and_store(send_email: bool = True, digest: bool = False) -> dict:
         snap["triggered"] = triggered
         return snap
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 _CONF_LEVEL = {"normal": 0, "yellow": 1, "red": 2, "top": 3}
